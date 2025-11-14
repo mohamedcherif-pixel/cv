@@ -4058,3 +4058,61 @@ body {
         font-size: 10px;
     }
 }
+
+body.loading {
+    overflow: hidden;
+}
+
+#global-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at top, rgba(78, 205, 196, 0.25), rgba(0, 0, 0, 0.9));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000000;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#global-loading-overlay.hide {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-content {
+    text-align: center;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #4ecdc4;
+    border-right-color: #4ecdc4;
+    margin: 0 auto 18px;
+    animation: loading-spin 0.8s linear infinite;
+}
+
+.loading-text-main {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.loading-text-sub {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+@keyframes loading-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}

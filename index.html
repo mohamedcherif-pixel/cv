@@ -15,7 +15,15 @@
     }
     </script>
 </head>
-<body>
+<body class="loading">
+    <div id="global-loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text-main">Loading 3D experience...</div>
+            <div class="loading-text-sub" id="loading-progress-text">0%</div>
+        </div>
+    </div>
+
     <!-- Floating 3D Drone -->
     <div class="drone-container">
         <canvas id="droneCanvas"></canvas>
@@ -41,7 +49,6 @@
             </div>
         </div>
     </div>
-
     <!-- Smooth Scroll Script -->
     <script>
         // Disable browser scroll restoration
@@ -58,7 +65,7 @@
         (function() {
             // Reset scroll position on load
             window.scrollTo(0, 0);
-            
+        
             let scrolling = false;
             let targetScrollY = 0; // Start at top
             let currentScrollY = 0; // Start at top
@@ -2686,6 +2693,42 @@
                 }
             }
         }, { passive: true });
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        const overlay = document.getElementById('global-loading-overlay');
+        const progressText = document.getElementById('loading-progress-text');
+        const manager = THREE.DefaultLoadingManager;
+
+        function updateProgress(itemsLoaded, itemsTotal) {
+            if (!progressText || !itemsTotal) return;
+            const pct = Math.round((itemsLoaded / itemsTotal) * 100);
+            progressText.textContent = pct + '%';
+        }
+
+        manager.onStart = function (url, itemsLoaded, itemsTotal) {
+            updateProgress(itemsLoaded, itemsTotal);
+        };
+
+        manager.onProgress = function (url, itemsLoaded, itemsTotal) {
+            updateProgress(itemsLoaded, itemsTotal);
+        };
+
+        function hideGlobalLoadingOverlay() {
+            if (!overlay) return;
+            overlay.classList.add('hide');
+            document.body.classList.remove('loading');
+        }
+
+        manager.onLoad = function () {
+            hideGlobalLoadingOverlay();
+        };
+
+        manager.onError = function (url) {
+            console.error('Error loading asset:', url);
+        };
     </script>
 
     <!-- 3D Drone Animation Script -->
