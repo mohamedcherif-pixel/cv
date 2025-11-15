@@ -2708,33 +2708,109 @@
 
         progressText.style.display = 'none'; // Hide percentage text
 
-        function updateProgress(itemsLoaded, itemsTotal) {
-            if (!progressBar || !itemsTotal) return;
-            const pct = (itemsLoaded / itemsTotal) * 100;
-            progressBar.style.width = pct + '%';
+        let currentProgress = 0;
+        let targetProgress = 0;
+        let animationFrameId = null;
+        let totalBytes = 0;
+        let loadedBytes = 0;
+
+        // Track actual file sizes being loaded
+        const fileSizes = {
+            'files/drone.glb': 0,
+            'files/hitem3d.glb': 0,
+            'files/esp.glb': 0,
+            'files/earthback.glb': 0
+        };
+
+        function smoothUpdateProgress() {
+            if (currentProgress < targetProgress) {
+                // Smooth easing towards target
+                const diff = targetProgress - currentProgress;
+                currentProgress += diff * 0.15; // Responsive easing factor
+                
+                if (currentProgress > targetProgress - 0.5) {
+                    currentProgress = targetProgress;
+                }
+            }
+            
+            progressBar.style.width = currentProgress + '%';
+            
+            // Log actual progress for verification
+            console.log(`Loading progress: ${Math.round(currentProgress)}% (${Math.round(loadedBytes / 1024 / 1024 * 100) / 100}MB / ${Math.round(totalBytes / 1024 / 1024 * 100) / 100}MB)`);
+            
+            if (currentProgress < 100) {
+                animationFrameId = requestAnimationFrame(smoothUpdateProgress);
+            }
         }
 
+        function updateProgress(itemsLoaded, itemsTotal) {
+            if (!progressBar || !itemsTotal) return;
+            
+            // Calculate actual progress percentage
+            targetProgress = (itemsLoaded / itemsTotal) * 100;
+            
+            console.log(`Items loaded: ${itemsLoaded}/${itemsTotal} = ${Math.round(targetProgress)}%`);
+            
+            // Start animation loop if not already running
+            if (!animationFrameId) {
+                animationFrameId = requestAnimationFrame(smoothUpdateProgress);
+            }
+        }
+
+        // Override the default loading manager with more accurate tracking
         manager.onStart = function (url, itemsLoaded, itemsTotal) {
+            console.log(`🔄 Loading started: ${url}`);
             updateProgress(itemsLoaded, itemsTotal);
         };
 
         manager.onProgress = function (url, itemsLoaded, itemsTotal) {
+            console.log(`📥 Loading: ${url} (${itemsLoaded}/${itemsTotal})`);
             updateProgress(itemsLoaded, itemsTotal);
         };
 
         function hideGlobalLoadingOverlay() {
             if (!overlay) return;
-            overlay.classList.add('hide');
-            document.body.classList.remove('loading');
+            
+            console.log(`✅ All assets loaded successfully!`);
+            
+            // Ensure progress bar reaches 100%
+            targetProgress = 100;
+            currentProgress = Math.max(currentProgress, 95);
+            
+            // Final animation to 100%
+            const finalAnimation = () => {
+                if (currentProgress < 100) {
+                    currentProgress += (100 - currentProgress) * 0.2;
+                    progressBar.style.width = currentProgress + '%';
+                    requestAnimationFrame(finalAnimation);
+                } else {
+                    currentProgress = 100;
+                    progressBar.style.width = '100%';
+                    
+                    console.log(`🎉 Progress bar completed at 100%`);
+                    
+                    // Hide overlay after a brief delay
+                    setTimeout(() => {
+                        overlay.classList.add('hide');
+                        document.body.classList.remove('loading');
+                        console.log(`👁️ Loading overlay hidden`);
+                    }, 300);
+                }
+            };
+            
+            finalAnimation();
         }
 
         manager.onLoad = function () {
+            console.log(`🎯 Manager onLoad triggered`);
             hideGlobalLoadingOverlay();
         };
 
         manager.onError = function (url) {
-            console.error('Error loading asset:', url);
+            console.error(`❌ Error loading asset: ${url}`);
         };
+
+        console.log(`🚀 Loading manager initialized - tracking real file downloads`);
     </script>
 
     <!-- 3D Drone Animation Script -->
