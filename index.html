@@ -97,11 +97,15 @@
             window.scrollTo(0, 0);
         });
         
-        // Smooth Scrolling Effect (desktop / non-mobile only)
+        // Smooth Scrolling Effect (desktop only, disabled on mobile & performance mode)
         (function() {
             const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                // On mobile, use the browser's native scrolling behavior
+            const isPerformanceMode = (typeof isPerformanceModeEnabled !== 'undefined')
+                ? isPerformanceModeEnabled
+                : (localStorage.getItem('cv_performance_mode') === 'true');
+
+            if (isMobile || isPerformanceMode) {
+                // On mobile or in performance mode, use the browser's native scrolling behavior
                 return;
             }
 
