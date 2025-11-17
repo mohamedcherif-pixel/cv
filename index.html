@@ -1575,16 +1575,7 @@
                         </div>
                         <span class="hobby-name">Music</span>
                     </div>
-                    <div class="hobby-item">
-                        <div class="hobby-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                <polyline points="21,15 16,10 5,21"></polyline>
-                            </svg>
-                        </div>
-                        <span class="hobby-name">Photography</span>
-                    </div>
+                    
                     <div class="hobby-item">
                          <div class="hobby-icon">
                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2106,7 +2097,15 @@
                         <source src="files/earthvid.mp4" type="video/mp4">
                     </video>
                 </div>
-                
+
+                <!-- External Project Link -->
+                <div style="margin-top: 16px; margin-bottom: 24px; text-align: center;">
+                    <a href="https://mohamedcherif-pixel.github.io/North_Africa_MapStatistics/" target="_blank" rel="noopener noreferrer"
+                       style="display: inline-block; padding: 10px 20px; border-radius: 999px; background: linear-gradient(135deg, #2196F3, #21CBF3); color: #ffffff; font-weight: 600; font-size: 14px; text-decoration: none; box-shadow: 0 8px 25px rgba(33, 150, 243, 0.4);">
+                        Open Interactive Map Project
+                    </a>
+                </div>
+
                 <!-- Project Description -->
                 <div class="project-description">
                     <h3 class="description-title">Project Overview</h3>
@@ -2259,6 +2258,14 @@
                         <div style="position: absolute; top: 15px; right: 15px; background: rgba(33, 150, 243, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; backdrop-filter: blur(10px);">
                             System Overview
                         </div>
+                    </div>
+
+                    <!-- PRIMA External Project Link -->
+                    <div style="margin-top: 8px; text-align: center;">
+                        <a href="https://prima-argi.web.app/index.html" target="_blank" rel="noopener noreferrer"
+                           style="display: inline-block; padding: 10px 22px; border-radius: 999px; background: linear-gradient(135deg, #8B5A2B, #3E2723); color: #ffffff; font-weight: 600; font-size: 14px; text-decoration: none; box-shadow: 0 8px 25px rgba(62, 39, 35, 0.6);">
+                            Visit PRIMA Live Platform
+                        </a>
                     </div>
                 </div>
 
@@ -3685,8 +3692,12 @@
         console.log('🎨 Background2 model loading...');
         
         let sceneBackground2, cameraBackground2, rendererBackground2, background2Model;
+        let background2Starfield; // rotating star shell like Earth background
 
         function initBackground2() {
+            console.log('🎨 initBackground2 called');
+            console.log('Performance mode:', localStorage.getItem(PERFORMANCE_MODE_KEY));
+            
             // Skip if performance mode is enabled
             if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
                 console.log('⚡ Performance mode enabled - skipping background2 loading');
@@ -3695,7 +3706,11 @@
             
             const canvas = document.getElementById('background2Canvas');
             const section = document.getElementById('projects-section-3');
-            if (!canvas || !section) return;
+            console.log('Canvas found:', !!canvas, 'Section found:', !!section);
+            if (!canvas || !section) {
+                console.error('❌ Canvas or section not found!');
+                return;
+            }
 
             if (window.innerWidth <= 768) {
                 canvas.style.display = 'none';
@@ -3705,12 +3720,49 @@
             // Scene
             sceneBackground2 = new THREE.Scene();
 
+            // Create Starfield Background (same idea as Earth background)
+            function createStarfield() {
+                console.log('🌟 Creating starfield for Background2...');
+                const starsGeometry = new THREE.BufferGeometry();
+                const starCount = 4500; // denser starfield for PRIMA section
+                const positions = new Float32Array(starCount * 3);
+
+                const radius = 550; // large shell so trees are always in front
+
+                for (let i = 0; i < starCount * 3; i += 3) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+
+                    positions[i]     = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i + 2] = radius * Math.cos(phi);
+                }
+
+                starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const starsMaterial = new THREE.PointsMaterial({
+                    size: 0.9,           // Match Earth star size for visibility
+                    color: 0x000000,     // Black stars for PRIMA section
+                    sizeAttenuation: true,
+                    transparent: true,
+                    opacity: 0.9,
+                    depthWrite: false,
+                    depthTest: true
+                });
+
+                background2Starfield = new THREE.Points(starsGeometry, starsMaterial);
+                sceneBackground2.add(background2Starfield);
+                console.log('✅ Starfield added to Background2 scene');
+            }
+            
+            createStarfield();
+
             // Camera
             cameraBackground2 = new THREE.PerspectiveCamera(
                 45,
                 section.offsetWidth / section.offsetHeight,
                 0.1,
-                1000
+                5000 // Increased far plane to see starfield
             );
             cameraBackground2.position.z = 25;
             cameraBackground2.position.y = 0;
@@ -3849,14 +3901,19 @@
                 // Apply easing
                 const easedProgress = easeInOutCubic(progress);
                 
-                // Calculate rotation (forward 0-0.5, reverse 0.5-1)
+                // Calculate rotation with a longer forward phase before reversing.
+                // Previously: forward 0-0.5, reverse 0.5-1.
+                // Now: forward 0-0.8, reverse 0.8-1 (requires more scroll to go backwards).
+                const forwardPortion = 0.8; // 80% of scroll range used for forward motion
                 let targetRotation = 0;
-                if (easedProgress < 0.5) {
-                    // Forward phase: 0 to maxRotation
-                    targetRotation = maxRotation * (easedProgress * 2);
+                if (easedProgress < forwardPortion) {
+                    // Forward phase: 0 -> maxRotation over most of the scroll
+                    const local = easedProgress / forwardPortion; // 0..1
+                    targetRotation = maxRotation * local;
                 } else {
-                    // Reverse phase: maxRotation back to 0
-                    targetRotation = maxRotation * (2 - easedProgress * 2);
+                    // Reverse phase: maxRotation back to 0 over the remaining scroll
+                    const local = (easedProgress - forwardPortion) / (1 - forwardPortion); // 0..1
+                    targetRotation = maxRotation * (1 - local);
                 }
                 
                 // Apply rotation directly
@@ -3911,9 +3968,15 @@
                 
                 // Update rotation every frame based on current scroll
                 updateRotation();
+
+                // Gentle starfield motion: very slow rotation like Earth background
+                if (background2Starfield) {
+                    background2Starfield.rotation.y += 0.00025;
+                    background2Starfield.rotation.x += 0.00008;
+                }
                 
                 // Render
-                if (background2Model) {
+                if (background2Model || background2Starfield) {
                     rendererBackground2.render(sceneBackground2, cameraBackground2);
                 }
             }
@@ -3972,43 +4035,14 @@
             });
             
             
-            // Improved scroll-based opacity transition
+            // Background2 canvas: keep fully visible to ensure starfield is never hidden
             function updateCanvasOpacity() {
-                const sectionRect = section.getBoundingClientRect();
-                const windowHeight = window.innerHeight;
-                const documentHeight = document.documentElement.scrollHeight;
-                const scrollY = window.scrollY;
-                
-                // Calculate section position relative to document
-                const sectionTop = scrollY + sectionRect.top;
-                const sectionHeight = sectionRect.height;
-                
-                // Calculate trigger points - start a bit later
-                const triggerStart = sectionTop - windowHeight * 0.2; // Start 20% of viewport BEFORE section
-                const triggerEnd = sectionTop + sectionHeight * 0.1;   // End 10% into section
-                
-                
-                // Calculate opacity based on scroll position
-                if (scrollY >= triggerStart && scrollY <= triggerEnd) {
-                    // Map scroll position to opacity (0 to 1)
-                    const progress = (scrollY - triggerStart) / (triggerEnd - triggerStart);
-                    // Apply easing function for smoother transition
-                    const easedProgress = progress * progress * (3 - 2 * progress); // Smoothstep
-                    // Set opacity directly
-                    canvas.style.opacity = easedProgress.toFixed(2);
-                } else if (scrollY > triggerEnd) {
-                    // Fully visible
-                    canvas.style.opacity = '1';
-                } else {
-                    // Not visible yet
-                    canvas.style.opacity = '0';
-                }
+                canvas.style.opacity = '1';
             }
-            
-            // Initial update
+
+            // Initial state
             updateCanvasOpacity();
-            
-            // Update on scroll
+            // Listener kept for future flexibility, but it just enforces opacity 1
             window.addEventListener('scroll', updateCanvasOpacity, { passive: true });
         }
 
