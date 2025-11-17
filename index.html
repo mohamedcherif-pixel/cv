@@ -31,7 +31,7 @@
     <!-- Performance Mode Button (Desktop Only) -->
     <div class="performance-mode-button" id="performanceModeBtn" title="Toggle Performance Mode">
         <div class="perf-icon">⚡</div>
-        <div class="perf-label">Performance</div>
+        <div class="perf-label">Performance (no 3D models)</div>
         <div class="perf-toggle">
             <div class="toggle-switch">
                 <div class="toggle-circle"></div>
@@ -2092,10 +2092,11 @@
 
             <div class="smart-home-showcase">
                 <!-- Project Video -->
-                <div class="earth-video-overlay">
-                    <video autoplay loop muted playsinline class="earth-project-video">
+                <div class="earth-video-overlay" data-video-container="true">
+                    <video autoplay loop muted playsinline controls class="earth-project-video">
                         <source src="files/earthvid.mp4" type="video/mp4">
                     </video>
+                    <button class="video-play-button">▶</button>
                 </div>
 
                 <!-- External Project Link -->
@@ -2243,21 +2244,23 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; margin-bottom: 60px;">
                 <!-- Left: Videos Stack -->
                 <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div style="position: relative; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
-                        <video autoplay muted loop width="100%" style="display: block; aspect-ratio: 16/9;">
+                    <div style="position: relative; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);" data-video-container="true">
+                        <video autoplay muted loop controls width="100%" style="display: block; aspect-ratio: 16/9;">
                             <source src="files/1108.mp4" type="video/mp4">
                         </video>
                         <div style="position: absolute; top: 15px; right: 15px; background: rgba(76, 175, 80, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; backdrop-filter: blur(10px);">
                             Live Demo
                         </div>
+                        <button class="video-play-button">▶</button>
                     </div>
-                    <div style="position: relative; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);">
-                        <video autoplay muted loop width="100%" style="display: block; aspect-ratio: 16/9;">
+                    <div style="position: relative; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);" data-video-container="true">
+                        <video autoplay muted loop controls width="100%" style="display: block; aspect-ratio: 16/9;">
                             <source src="files/1108(1).mp4" type="video/mp4">
                         </video>
                         <div style="position: absolute; top: 15px; right: 15px; background: rgba(33, 150, 243, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; backdrop-filter: blur(10px);">
                             System Overview
                         </div>
+                        <button class="video-play-button">▶</button>
                     </div>
 
                     <!-- PRIMA External Project Link -->
@@ -2752,6 +2755,7 @@
         }, { passive: true });
     </script>
 
+    <!-- Global Loading Manager Script -->
     <script type="module">
         import * as THREE from 'three';
 
@@ -2761,51 +2765,60 @@
         const progressBar = document.getElementById('progress-bar');
         const manager = THREE.DefaultLoadingManager;
 
-        progressText.style.display = 'none'; // Hide percentage text
+        // Hide percentage text, we only show the bar
+        if (progressText) {
+            progressText.style.display = 'none';
+        }
 
         let currentProgress = 0;
         let targetProgress = 0;
         let animationFrameId = null;
-        let totalBytes = 0;
-        let loadedBytes = 0;
-
-        // Track actual file sizes being loaded
-        const fileSizes = {
-            'files/drone.glb': 0,
-            'files/hitem3d.glb': 0,
-            'files/esp.glb': 0,
-            'files/earthback.glb': 0
-        };
+        let lastLoggedProgress = -1; // Track last logged value to avoid spam
 
         function smoothUpdateProgress() {
-            if (currentProgress < targetProgress) {
+            // Clamp target between 0 and 100 to avoid overshooting
+            const maxTarget = Math.max(0, Math.min(targetProgress, 100));
+
+            if (currentProgress < maxTarget) {
                 // Smooth easing towards target
-                const diff = targetProgress - currentProgress;
+                const diff = maxTarget - currentProgress;
                 currentProgress += diff * 0.15; // Responsive easing factor
-                
-                if (currentProgress > targetProgress - 0.5) {
-                    currentProgress = targetProgress;
+
+                if (currentProgress > maxTarget - 0.5) {
+                    currentProgress = maxTarget;
                 }
+            } else if (currentProgress > maxTarget) {
+                // If target moved backwards (rare), snap down to it
+                currentProgress = maxTarget;
             }
-            
-            progressBar.style.width = currentProgress + '%';
-            
-            // Log actual progress for verification
-            console.log(`Loading progress: ${Math.round(currentProgress)}% (${Math.round(loadedBytes / 1024 / 1024 * 100) / 100}MB / ${Math.round(totalBytes / 1024 / 1024 * 100) / 100}MB)`);
-            
-            if (currentProgress < 100) {
+
+            if (progressBar) {
+                progressBar.style.width = currentProgress + '%';
+            }
+
+            // Log only when integer percentage changes to avoid spam and "stuck" feeling
+            const rounded = Math.round(currentProgress);
+            if (rounded !== lastLoggedProgress) {
+                console.log(`Loading progress: ${rounded}%`);
+                lastLoggedProgress = rounded;
+            }
+
+            if (currentProgress < maxTarget && currentProgress < 100) {
                 animationFrameId = requestAnimationFrame(smoothUpdateProgress);
+            } else {
+                animationFrameId = null;
             }
         }
 
         function updateProgress(itemsLoaded, itemsTotal) {
             if (!progressBar || !itemsTotal) return;
-            
-            // Calculate actual progress percentage
-            targetProgress = (itemsLoaded / itemsTotal) * 100;
-            
+
+            // Calculate actual progress percentage and clamp to [0, 100]
+            const raw = (itemsLoaded / itemsTotal) * 100;
+            targetProgress = Math.max(0, Math.min(raw, 100));
+
             console.log(`Items loaded: ${itemsLoaded}/${itemsTotal} = ${Math.round(targetProgress)}%`);
-            
+
             // Start animation loop if not already running
             if (!animationFrameId) {
                 animationFrameId = requestAnimationFrame(smoothUpdateProgress);
@@ -2836,11 +2849,15 @@
             const finalAnimation = () => {
                 if (currentProgress < 100) {
                     currentProgress += (100 - currentProgress) * 0.2;
-                    progressBar.style.width = currentProgress + '%';
+                    if (progressBar) {
+                        progressBar.style.width = currentProgress + '%';
+                    }
                     requestAnimationFrame(finalAnimation);
                 } else {
                     currentProgress = 100;
-                    progressBar.style.width = '100%';
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                    }
                     
                     console.log(`🎉 Progress bar completed at 100%`);
                     
@@ -2870,7 +2887,9 @@
             console.log(`📱 Mobile detected - hiding loading screen immediately`);
             targetProgress = 100;
             currentProgress = 100;
-            progressBar.style.width = '100%';
+            if (progressBar) {
+                progressBar.style.width = '100%';
+            }
             
             setTimeout(() => {
                 overlay.classList.add('hide');
@@ -2882,205 +2901,43 @@
         console.log(`🚀 Loading manager initialized - tracking real file downloads`);
     </script>
 
-    <!-- 3D Drone Animation Script -->
-    <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    <!-- Video Play Button Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const containers = document.querySelectorAll('[data-video-container="true"]');
+            containers.forEach(function(container) {
+                const video = container.querySelector('video');
+                const button = container.querySelector('.video-play-button');
+                if (!video || !button) return;
 
-        console.log('🚁 Drone script loading...');
-        
-        // 3D Drone with Scroll-Based Animation
-        let scene, camera, renderer, drone, mixer, clock;
-        let lastScrollY = 0;
-        let lastScrollTime = Date.now();
-        let scrollVelocity = 0;
-        let animationActive = false;
-        let animationSpeed = 0; // Current animation speed (for easing)
-        let targetAnimationSpeed = 0; // Target animation speed
-
-        function init3DDrone() {
-            console.log('🚁 Initializing drone...');
-            
-            // Skip if performance mode is enabled
-            if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
-                console.log('⚡ Performance mode enabled - skipping drone loading');
-                return;
-            }
-            
-            const canvas = document.getElementById('droneCanvas');
-            const container = document.querySelector('.drone-container');
-            
-            if (window.innerWidth <= 768) {
-                if (container) container.style.display = 'none';
-                if (canvas) canvas.style.display = 'none';
-                return;
-            }
-            
-            if (!canvas) {
-                console.error('❌ Canvas element not found!');
-                return;
-            }
-            
-            console.log('✅ Canvas found:', canvas);
-            
-            // Scene setup
-            scene = new THREE.Scene();
-            console.log('✅ Scene created');
-            
-            // Camera setup
-            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-            camera.position.z = 29;
-            console.log('✅ Camera created');
-            
-            // Renderer setup
-            renderer = new THREE.WebGLRenderer({ 
-                canvas: canvas, 
-                alpha: true,
-                antialias: true 
-            });
-            renderer.setSize(150, 150);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            console.log('✅ Renderer created');
-            
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(5, 5, 5);
-            scene.add(directionalLight);
-            
-            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-            directionalLight2.position.set(-5, -5, -5);
-            scene.add(directionalLight2);
-            console.log('✅ Lights added');
-            
-            // Load GLB model
-            console.log('📦 Loading drone.glb...');
-            const loader = new GLTFLoader();
-            loader.load('files/drone.glb', 
-                function(gltf) {
-                    console.log('✅ Drone loaded successfully!', gltf);
-                    drone = gltf.scene;
-                    
-                    // Center and scale the model
-                    const box = new THREE.Box3().setFromObject(drone);
-                    const center = box.getCenter(new THREE.Vector3());
-                    drone.position.sub(center);
-                    
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = 2 / maxDim;
-                    drone.scale.set(scale, scale, scale);
-                    
-                    scene.add(drone);
-                    console.log('✅ Drone added to scene');
-                    
-                    // Setup animation mixer if the model has animations
-                    if (gltf.animations && gltf.animations.length > 0) {
-                        console.log('✅ Animations found:', gltf.animations.length);
-                        mixer = new THREE.AnimationMixer(drone);
-                        const action = mixer.clipAction(gltf.animations[0]);
-                        action.play();
+                function updateButton() {
+                    if (video.paused) {
+                        button.style.opacity = '1';
+                        button.style.pointerEvents = 'auto';
                     } else {
-                        console.log('⚠️ No animations in model');
+                        button.style.opacity = '0';
+                        button.style.pointerEvents = 'none';
                     }
-                    
-                    clock = new THREE.Clock();
-                    animate();
-                }, 
-                function(progress) {
-                    console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-                },
-                function(error) {
-                    console.error('❌ Error loading drone model:', error);
                 }
-            );
-        }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            if (drone) {
-                // Gentle floating animation
-                const time = Date.now() * 0.001;
-                drone.position.y = Math.sin(time * 0.5) * 0.1;
-                drone.rotation.y += 0.0005; // Much slower rotation
-                
-                // Smooth ease in/out for animation speed based on scroll velocity
-                const easeSpeed = 0.08; // How fast it eases in/out
-                
-                if (animationActive) {
-                    // Map scroll velocity to animation speed (0 to 3)
-                    // Clamp between 0.2 (minimum when scrolling) and 3 (maximum)
-                    const velocityFactor = Math.min(Math.abs(scrollVelocity) / 500, 3);
-                    targetAnimationSpeed = Math.max(0.2, velocityFactor);
-                } else {
-                    targetAnimationSpeed = 0.0;
-                }
-                
-                // Smoothly transition animation speed
-                animationSpeed += (targetAnimationSpeed - animationSpeed) * easeSpeed;
-                
-                // Update animation mixer with eased speed
-                if (mixer && animationSpeed > 0.01) {
-                    const delta = clock.getDelta();
-                    mixer.update(delta * animationSpeed * 0.5); // Use eased speed
-                }
-            }
-            
-            renderer.render(scene, camera);
-        }
+                updateButton();
+                video.addEventListener('play', updateButton);
+                video.addEventListener('pause', updateButton);
 
-        // Scroll-based animation control with velocity tracking
-        let scrollTimeout;
-        let isScrolling = false;
-        
-        window.addEventListener('scroll', function() {
-            const container = document.querySelector('.drone-container');
-            const currentScrollY = window.scrollY;
-            const currentTime = Date.now();
-            
-            // Calculate scroll velocity (pixels per millisecond)
-            const deltaScroll = Math.abs(currentScrollY - lastScrollY);
-            const deltaTime = Math.max(currentTime - lastScrollTime, 1); // Avoid division by zero
-            scrollVelocity = (deltaScroll / deltaTime) * 1000; // Convert to pixels per second
-            
-            // Update tracking variables
-            lastScrollY = currentScrollY;
-            lastScrollTime = currentTime;
-            
-            // Activate animation immediately on any scroll
-            animationActive = true;
-            isScrolling = true;
-            
-            if (container) {
-                container.classList.add('active');
-            }
-            
-            // Clear previous timeout
-            clearTimeout(scrollTimeout);
-            
-            // Stop animation after scrolling stops (50ms detection)
-            scrollTimeout = setTimeout(function() {
-                animationActive = false;
-                isScrolling = false;
-                scrollVelocity = 0;
-                if (container) {
-                    container.classList.remove('active');
-                }
-            }, 50);
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                });
+            });
         });
-
-        // Initialize when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init3DDrone);
-        } else {
-            init3DDrone();
-        }
     </script>
 
-    <!-- Smart Home 3D Model Script -->
+    <!-- 3D Drone Animation Script -->
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -3210,7 +3067,9 @@
                     animate();
                 },
                 function(progress) {
-                    console.log('Smart Home loading:', (progress.loaded / progress.total * 100) + '%');
+                    const pct = progress.total ? (progress.loaded / progress.total * 100) : 0;
+                    const clamped = Math.max(0, Math.min(pct, 100));
+                    console.log('Smart Home loading:', clamped.toFixed(1) + '%');
                 },
                 function(error) {
                     console.error('Error loading smart home model:', error);
