@@ -97,8 +97,14 @@
             window.scrollTo(0, 0);
         });
         
-        // Smooth Scrolling Effect
+        // Smooth Scrolling Effect (desktop / non-mobile only)
         (function() {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                // On mobile, use the browser's native scrolling behavior
+                return;
+            }
+
             // Reset scroll position on load
             window.scrollTo(0, 0);
         
@@ -371,10 +377,8 @@
         }
     </script>
     <script>
-        // GitHub Gist Configuration for Global Visitor Tracking
-        const GITHUB_TOKEN = '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';
-        const GIST_ID = '5a09d43bff01fcaded0f2075b98ce4f6';
-        const GITHUB_API_URL = `https://api.github.com/gists/${GIST_ID}`;
+        // Backend Configuration
+        const BACKEND_URL = 'https://cv-backend-fzp9.onrender.com';
 
         // Advanced Browser Fingerprinting for Unique Visitor Tracking
         async function generateDeviceFingerprint() {
@@ -404,128 +408,42 @@
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
-        async function getGistData() {
-            try {
-                const response = await fetch(GITHUB_API_URL, {
-                    headers: {
-                        'Authorization': `token ${GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                
-                if (!response.ok) throw new Error('Failed to fetch gist');
-                
-                const gist = await response.json();
-                const content = gist.files['visitors.json'].content;
-                return JSON.parse(content);
-            } catch (error) {
-                console.error('Error fetching gist:', error);
-                return { visitors: {}, totalViews: 0 };
-            }
-        }
-
-        async function updateGistData(visitorData) {
-            try {
-                const response = await fetch(GITHUB_API_URL, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `token ${GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'visitors.json': {
-                                content: JSON.stringify(visitorData, null, 2)
-                            }
-                        }
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Failed to update gist');
-                console.log('✅ Gist updated successfully');
-                return true;
-            } catch (error) {
-                console.error('Error updating gist:', error);
-                return false;
-            }
-        }
-
         async function trackVisitor() {
             try {
                 const fingerprint = await generateDeviceFingerprint();
                 
-                // Get data from GitHub Gist (global)
-                let visitorData = await getGistData();
+                // Send fingerprint to backend
+                const response = await fetch(`${BACKEND_URL}/api/track-visitor`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fingerprint })
+                });
                 
-                if (!visitorData.visitors) {
-                    visitorData.visitors = {};
-                    visitorData.totalViews = 0;
+                if (!response.ok) {
+                    throw new Error(`Backend error: ${response.status}`);
                 }
                 
-                const now = new Date().toISOString();
+                const data = await response.json();
                 
-                // Check if this device has visited before
-                if (!visitorData.visitors[fingerprint]) {
-                    // New unique visitor
-                    visitorData.visitors[fingerprint] = {
-                        firstVisit: now,
-                        lastVisit: now,
-                        visitCount: 1
-                    };
+                // Animate counter with global unique visitor count
+                animateCounter(data.uniqueVisitors);
+                
+                // Log tracking info
+                if (data.isNewVisitor) {
                     console.log('🆕 New unique visitor detected');
                 } else {
-                    // Returning visitor
-                    visitorData.visitors[fingerprint].lastVisit = now;
-                    visitorData.visitors[fingerprint].visitCount++;
                     console.log('🔄 Returning visitor detected');
                 }
                 
-                visitorData.totalViews++;
-                visitorData.lastUpdated = now;
+                console.log(`📊 Visitor tracked: ${fingerprint.substring(0, 8)}... | Unique visitors: ${data.uniqueVisitors} | Total views: ${data.totalViews}`);
                 
-                // Update GitHub Gist with new data
-                await updateGistData(visitorData);
-                
-                // Also save to localStorage as backup
-                localStorage.setItem('cvVisitorData', JSON.stringify(visitorData));
-                
-                // Get unique visitor count
-                const uniqueVisitors = Object.keys(visitorData.visitors).length;
-                
-                // Animate counter
-                animateCounter(uniqueVisitors);
-                
-                // Log tracking info
-                console.log(`📊 Visitor tracked: ${fingerprint.substring(0, 8)}... | Unique visitors: ${uniqueVisitors} | Total views: ${visitorData.totalViews}`);
-                
-                return uniqueVisitors;
+                return data.uniqueVisitors;
             } catch (error) {
                 console.error('Error tracking visitor:', error);
-                // Fallback to localStorage
-                try {
-                    const fingerprint = await generateDeviceFingerprint();
-                    let visitorData = JSON.parse(localStorage.getItem('cvVisitorData') || '{}');
-                    
-                    if (!visitorData.visitors) {
-                        visitorData.visitors = {};
-                        visitorData.totalViews = 0;
-                    }
-                    
-                    const now = new Date().toISOString();
-                    if (!visitorData.visitors[fingerprint]) {
-                        visitorData.visitors[fingerprint] = { firstVisit: now, lastVisit: now, visitCount: 1 };
-                    } else {
-                        visitorData.visitors[fingerprint].lastVisit = now;
-                        visitorData.visitors[fingerprint].visitCount++;
-                    }
-                    visitorData.totalViews++;
-                    
-                    localStorage.setItem('cvVisitorData', JSON.stringify(visitorData));
-                    animateCounter(Object.keys(visitorData.visitors).length);
-                } catch (e) {
-                    animateCounter(1);
-                }
+                // Fallback: show at least 1
+                animateCounter(1);
             }
         }
 
