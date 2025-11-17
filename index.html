@@ -6,6 +6,7 @@
     <title>Professional CV</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="drone-styles.css">
+    <link rel="icon" type="image/png" href="files/cv.png">
     <script type="importmap">
     {
         "imports": {
@@ -3081,6 +3082,12 @@
         let sceneHome, cameraHome, rendererHome, smartHome, controls;
 
         function initSmartHome3D() {
+            // Skip if performance mode is enabled
+            if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
+                console.log('⚡ Performance mode enabled - skipping smart home loading');
+                return;
+            }
+            
             const canvas = document.getElementById('smartHomeCanvas');
             if (!canvas) return;
 
