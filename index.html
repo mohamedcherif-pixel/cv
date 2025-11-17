@@ -1992,7 +1992,7 @@
                         <span class="label-hint">Real-time monitoring</span>
                     </div>
                     <div class="video-wrapper">
-                        <video class="project-video" autoplay loop muted playsinline>
+                        <video class="project-video" autoplay loop muted playsinline preload="none">
                             <source src="files/smarthomepc.mp4" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
@@ -2013,7 +2013,7 @@
                         <span class="label-hint">Control from anywhere</span>
                     </div>
                     <div class="video-wrapper">
-                        <video class="project-video" autoplay loop muted playsinline>
+                        <video class="project-video" autoplay loop muted playsinline preload="none">
                             <source src="files/smarthomephone.mp4" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
@@ -3261,6 +3261,25 @@
                 svg.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
             }
         }
+
+        // Lazy load videos - only load when visible
+        const videoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const video = entry.target;
+                    if (!video.src && video.querySelector('source')) {
+                        // Video hasn't loaded yet, let it load
+                        video.load();
+                    }
+                    videoObserver.unobserve(video);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        // Observe all videos
+        document.querySelectorAll('.project-video').forEach(video => {
+            videoObserver.observe(video);
+        });
     </script>
 
     <!-- ESP32 Parallax 3D Model Script -->
