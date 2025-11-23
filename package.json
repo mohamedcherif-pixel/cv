@@ -1,0 +1,25 @@
+{
+  "name": "cv",
+  "version": "1.0.0",
+  "main": "draco_decoder.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohamedcherif-pixel/cv.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mohamedcherif-pixel/cv/issues"
+  },
+  "homepage": "https://github.com/mohamedcherif-pixel/cv#readme",
+  "description": "",
+  "dependencies": {
+    "draco3d": "^1.5.7",
+    "gltf-pipeline": "^4.3.0",
+    "three": "^0.181.2"
+  }
+}

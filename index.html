@@ -2951,15 +2951,20 @@
         });
     </script>
 
-    <!-- 3D Drone Animation Script -->
+    <!-- REPLACED SMART HOME SCRIPT -->
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
         let sceneHome, cameraHome, rendererHome, smartHome, controls;
+        let smartHomeLoaded = false;
 
         function initSmartHome3D() {
+            if(smartHomeLoaded) return; // Prevent double load
+            smartHomeLoaded = true;
+
             // Skip if performance mode is enabled
             if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
                 console.log('⚡ Performance mode enabled - skipping smart home loading');
@@ -2976,90 +2981,37 @@
                 return;
             }
 
-            // Scene setup
+            // Scene Setup
             sceneHome = new THREE.Scene();
-            sceneHome.background = null;
-
-            // Camera - isometric-like view to see all sides
-            cameraHome = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+            cameraHome = new THREE.PerspectiveCamera(45, canvas.parentElement.clientWidth / canvas.parentElement.clientHeight, 0.1, 1000);
             cameraHome.position.set(8, 6, 8);
-            cameraHome.lookAt(0, 0, 0);
 
-            // Renderer
-            rendererHome = new THREE.WebGLRenderer({ 
-                canvas: canvas, 
-                alpha: true,
-                antialias: true 
-            });
-            
-            // Set size based on container
-            const container = canvas.parentElement;
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            rendererHome.setSize(width, height);
+            rendererHome = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            rendererHome.setSize(canvas.parentElement.clientWidth, canvas.parentElement.clientHeight);
             rendererHome.setPixelRatio(window.devicePixelRatio);
-            cameraHome.aspect = width / height;
-            cameraHome.updateProjectionMatrix();
 
-            // Enhanced Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            sceneHome.add(ambientLight);
+            // Lights
+            sceneHome.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dl1 = new THREE.DirectionalLight(0xffffff, 1.2); dl1.position.set(5, 10, 5); sceneHome.add(dl1);
+            const dl2 = new THREE.DirectionalLight(0x4ecdc4, 0.5); dl2.position.set(-5, 5, -5); sceneHome.add(dl2);
 
-            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
-            directionalLight1.position.set(5, 10, 5);
-            sceneHome.add(directionalLight1);
-
-            const directionalLight2 = new THREE.DirectionalLight(0x4ecdc4, 0.5);
-            directionalLight2.position.set(-5, 5, -5);
-            sceneHome.add(directionalLight2);
-
-            const directionalLight3 = new THREE.DirectionalLight(0xffffff, 0.4);
-            directionalLight3.position.set(0, -5, 0);
-            sceneHome.add(directionalLight3);
-
-            // OrbitControls for full interaction
+            // Controls
             controls = new OrbitControls(cameraHome, canvas);
             controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.enableZoom = true;
-            controls.enableRotate = true;
-            controls.enablePan = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.5; // Very slow auto rotation
+            controls.autoRotateSpeed = 0.5;
             controls.minDistance = 5;
             controls.maxDistance = 20;
-            controls.target.set(0, 0, 0);
 
-            // Prevent page scroll when zooming over canvas (but allow OrbitControls to work)
-            canvas.addEventListener('wheel', (e) => {
-                // Only prevent default if we're actually over the canvas
-                if (e.target === canvas || canvas.contains(e.target)) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            }, { passive: false });
+            // Draco Loader
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 
-            // Keyboard controls for zoom
-            document.addEventListener('keydown', (e) => {
-                const key = e.key.toLowerCase();
-                if (key === '+' || key === '=' || key === 'arrowup' || key === 'z') {
-                    e.preventDefault();
-                    // Zoom in by moving camera closer
-                    const direction = cameraHome.position.clone().normalize();
-                    cameraHome.position.addScaledVector(direction, -0.5);
-                    controls.update();
-                } else if (key === '-' || key === '_' || key === 'arrowdown' || key === 's') {
-                    e.preventDefault();
-                    // Zoom out by moving camera further
-                    const direction = cameraHome.position.clone().normalize();
-                    cameraHome.position.addScaledVector(direction, 0.5);
-                    controls.update();
-                }
-            });
-
-            // Load Smart Home Model
             const loader = new GLTFLoader();
-            loader.load('files/hitem3d.glb', 
+            loader.setDRACOLoader(dracoLoader);
+
+            // UPDATED PATH: files/compressed/
+            loader.load('files/compressed/hitem3d.glb', 
                 function(gltf) {
                     smartHome = gltf.scene;
                     
@@ -3118,7 +3070,14 @@
             });
         }
 
-        // Initialize
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            if (smartHome) smartHome.position.y = Math.sin(Date.now() * 0.001 * 0.5) * 0.05;
+            rendererHome.render(sceneHome, cameraHome);
+        }
+
+        // Immediate Loading - Start Smart Home on page load
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initSmartHome3D);
         } else {
@@ -3162,86 +3121,179 @@
         });
     </script>
 
-    <!-- ESP32 Parallax 3D Model Script -->
+    <!-- REPLACED DRONE SCRIPT -->
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-        let sceneESP, cameraESP, rendererESP, esp32Model;
-        let projectsSection;
-        const isMobileESP = window.innerWidth <= 768;
+        let scene, camera, renderer, drone, mixer, clock;
+        let animationActive = false;
+        let animationSpeed = 0;
+        let targetAnimationSpeed = 0;
+        let lastScrollY = 0;
+        let lastScrollTime = Date.now();
+        let scrollVelocity = 0;
+
+        function init3DDrone() {
+            const canvas = document.getElementById('droneCanvas');
+            if (!canvas) return;
+
+            // Skip if performance mode is enabled
+            if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
+                console.log('⚡ Performance mode enabled - skipping drone loading');
+                return;
+            }
+
+            // Scene Setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+            camera.position.z = 29;
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            renderer.setSize(150, 150);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(5, 5, 5);
+            scene.add(dirLight);
+
+            // Load Compressed Model
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+            dracoLoader.setDecoderConfig({ type: 'js' }); // Ensure JS fallback
+
+            const loader = new GLTFLoader();
+            loader.setDRACOLoader(dracoLoader);
+
+            // UPDATED PATH: files/compressed/
+            loader.load('files/compressed/drone.glb', function(gltf) {
+                drone = gltf.scene;
+                
+                // Center & Scale
+                const box = new THREE.Box3().setFromObject(drone);
+                const size = box.getSize(new THREE.Vector3());
+                const scale = 2 / Math.max(size.x, size.y, size.z);
+                drone.scale.set(scale, scale, scale);
+                drone.position.sub(box.getCenter(new THREE.Vector3()));
+                
+                scene.add(drone);
+                
+                if (gltf.animations.length) {
+                    mixer = new THREE.AnimationMixer(drone);
+                    mixer.clipAction(gltf.animations[0]).play();
+                }
+                
+                clock = new THREE.Clock();
+                animate();
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (drone) {
+                const time = Date.now() * 0.001;
+                drone.position.y = Math.sin(time * 0.5) * 0.1;
+                drone.rotation.y += 0.0005;
+
+                // Scroll velocity logic
+                const easeSpeed = 0.08;
+                if (animationActive) {
+                    const velocityFactor = Math.min(Math.abs(scrollVelocity) / 500, 3);
+                    targetAnimationSpeed = Math.max(0.2, velocityFactor);
+                } else {
+                    targetAnimationSpeed = 0.0;
+                }
+                animationSpeed += (targetAnimationSpeed - animationSpeed) * easeSpeed;
+                
+                if (mixer && animationSpeed > 0.01) {
+                    mixer.update(clock.getDelta() * animationSpeed * 0.5);
+                }
+            }
+            renderer.render(scene, camera);
+        }
+
+        // Scroll Logic
+        let scrollTimeout;
+        window.addEventListener('scroll', function() {
+            const container = document.querySelector('.drone-container');
+            const currentScrollY = window.scrollY;
+            const currentTime = Date.now();
+            const deltaScroll = Math.abs(currentScrollY - lastScrollY);
+            scrollVelocity = (deltaScroll / Math.max(currentTime - lastScrollTime, 1)) * 1000;
+            
+            lastScrollY = currentScrollY;
+            lastScrollTime = currentTime;
+            animationActive = true;
+            if(container) container.classList.add('active');
+
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                animationActive = false;
+                scrollVelocity = 0;
+                if(container) container.classList.remove('active');
+            }, 50);
+        });
+
+        // Start Drone immediately (Top of page)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init3DDrone);
+        } else {
+            init3DDrone();
+        }
+    </script>
+
+    <!-- REPLACED ESP32 SCRIPT -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+        let sceneESP, cameraESP, rendererESP, esp32Model, projectsSection;
+        let esp32Loaded = false;
 
         function initESP32Parallax() {
+            if(esp32Loaded) return;
+            esp32Loaded = true;
+
             const canvas = document.getElementById('esp32Canvas');
             if (!canvas) return;
 
             projectsSection = document.querySelector('.projects-section');
-            if (!projectsSection) return;
-
-            // Scene setup
             sceneESP = new THREE.Scene();
-            sceneESP.background = null;
-
-            // Camera
             cameraESP = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
             cameraESP.position.set(0, 2, 5);
-            cameraESP.lookAt(0, 0, 0);
 
-            // Renderer
-            const canvasSize = isMobileESP ? 200 : 300;
-            rendererESP = new THREE.WebGLRenderer({ 
-                canvas: canvas, 
-                alpha: true,
-                antialias: true 
-            });
-            rendererESP.setSize(canvasSize, canvasSize);
+            rendererESP = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            rendererESP.setSize(300, 300);
             rendererESP.setPixelRatio(window.devicePixelRatio);
 
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            sceneESP.add(ambientLight);
+            sceneESP.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(5, 10, 5); sceneESP.add(dl);
 
-            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
-            directionalLight1.position.set(5, 10, 5);
-            sceneESP.add(directionalLight1);
+            // Draco Loader
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 
-            const directionalLight2 = new THREE.DirectionalLight(0x4ecdc4, 0.6);
-            directionalLight2.position.set(-5, 5, -5);
-            sceneESP.add(directionalLight2);
-
-            // Load ESP32 Model
             const loader = new GLTFLoader();
-            loader.load('files/esp.glb', 
-                function(gltf) {
-                    esp32Model = gltf.scene;
-                    
-                    // Center and scale - BIGGER
-                    const box = new THREE.Box3().setFromObject(esp32Model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    esp32Model.position.x = -center.x;
-                    esp32Model.position.y = -center.y;
-                    esp32Model.position.z = -center.z;
-                    
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = isMobileESP ? 2.5 / maxDim : 3.5 / maxDim; // Smaller scale for mobile
-                    esp32Model.scale.set(scale, scale, scale);
-                    
-                    // Start hidden (scaled down)
-                    esp32Model.scale.multiplyScalar(0.01);
-                    
-                    sceneESP.add(esp32Model);
-                    
-                    // Fade in canvas
-                    canvas.classList.add('loaded');
-                    
-                    animate();
-                },
-                undefined,
-                function(error) {
-                    console.error('Error loading ESP32 model:', error);
-                }
-            );
+            loader.setDRACOLoader(dracoLoader);
+
+            // UPDATED PATH: files/compressed/
+            loader.load('files/compressed/esp.glb', function(gltf) {
+                esp32Model = gltf.scene;
+                const box = new THREE.Box3().setFromObject(esp32Model);
+                const scale = 3.5 / Math.max(box.getSize(new THREE.Vector3()).x, box.getSize(new THREE.Vector3()).y, box.getSize(new THREE.Vector3()).z);
+                esp32Model.scale.set(0.01, 0.01, 0.01); // Start hidden
+                esp32Model.position.sub(box.getCenter(new THREE.Vector3()));
+                esp32Model.position.y += 1.5; // Move up by 1.5 units
+
+                sceneESP.add(esp32Model);
+                canvas.classList.add('loaded');
+                animate();
+            });
 
             function animate() {
                 requestAnimationFrame(animate);
@@ -3255,51 +3307,23 @@
 
             function updateParallax() {
                 const rect = projectsSection.getBoundingClientRect();
-                const windowHeight = window.innerHeight;
+                const start = window.innerHeight * 1.2;
+                const end = window.innerHeight * 0.2;
+                let progress = (rect.top < start && rect.top > end) ? (start - rect.top) / (start - end) : (rect.top <= end ? 1 : 0);
                 
-                // Calculate scroll progress (0 to 1) - STARTS SOONER
-                // Start when section enters bottom of viewport
-                const startPoint = windowHeight * 1.2; // Start earlier
-                const endPoint = windowHeight * 0.2; // End sooner
-                
-                let progress = 0;
-                if (rect.top < startPoint && rect.top > endPoint) {
-                    progress = (startPoint - rect.top) / (startPoint - endPoint);
-                } else if (rect.top <= endPoint) {
-                    progress = 1;
-                }
-                
-                // SMOOTHER easing with ease-in-out
+                // Easing
                 progress = Math.min(Math.max(progress, 0), 1);
-                const easedProgress = progress < 0.5 
-                    ? 4 * progress * progress * progress 
-                    : 1 - Math.pow(-2 * progress + 2, 3) / 2; // Ease in-out cubic
-                
-                // Scale: zoom in from 0.01 to target scale
-                const targetScale = 3.5 / Math.max(
-                    esp32Model.geometry ? 1 : 1,
-                    1
-                );
-                const currentScale = 0.01 + (targetScale * easedProgress);
+                const eased = progress < 0.5 ? 4 * Math.pow(progress, 3) : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+                const targetScale = 3.5;
+                const currentScale = 0.01 + (targetScale * eased);
                 esp32Model.scale.set(currentScale, currentScale, currentScale);
+
+                const scrollRel = Math.max(0, window.pageYOffset - (projectsSection.offsetTop - window.innerHeight));
+                esp32Model.rotation.y = scrollRel * 0.004;
+                esp32Model.rotation.x = Math.sin(scrollRel * 0.002) * 0.3;
                 
-                // Fade in: opacity from 0 to 1 - STARTS LATER
-                // Only start fading after 40% of the animation
-                const fadeProgress = Math.max(0, (easedProgress - 0.4) / 0.6);
-                esp32Model.traverse((child) => {
-                    if (child.material) {
-                        child.material.opacity = fadeProgress;
-                        child.material.transparent = true;
-                    }
-                });
-                
-                // Rotation: spin based on scroll - SPINS SOONER AND FASTER
-                const scrollAmount = window.pageYOffset;
-                const sectionTop = projectsSection.offsetTop - windowHeight; // Start spinning sooner
-                const relativeScroll = Math.max(0, scrollAmount - sectionTop);
-                
-                esp32Model.rotation.y = relativeScroll * 0.004; // Faster spin (doubled from 0.002)
-                esp32Model.rotation.x = Math.sin(relativeScroll * 0.002) * 0.3; // More tilt
+                esp32Model.traverse(c => { if(c.material) c.material.opacity = Math.max(0, (eased - 0.4) / 0.6); });
             }
 
             // Update on scroll
@@ -3313,7 +3337,7 @@
             updateParallax();
         }
 
-        // Initialize
+            // Immediate Loading - Start ESP32 on page load
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initESP32Parallax);
         } else {
@@ -3321,16 +3345,19 @@
         }
     </script>
 
-    <!-- Earth Background 3D Model Script -->
+    <!-- REPLACED EARTH SCRIPT -->
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-        console.log('🌍 Earth background loading...');
-        
         let sceneEarth, cameraEarth, rendererEarth, earthModel;
+        let earthLoaded = false;
 
         function initEarthBackground() {
+            if(earthLoaded) return;
+            earthLoaded = true;
+
             // Skip if performance mode is enabled
             if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
                 console.log('⚡ Performance mode enabled - skipping earth background loading');
@@ -3346,74 +3373,11 @@
                 return;
             }
 
-            // Scene
             sceneEarth = new THREE.Scene();
+            cameraEarth = new THREE.PerspectiveCamera(45, section.offsetWidth / section.offsetHeight, 0.1, 1000);
+            cameraEarth.position.z = 210;
+            cameraEarth.position.y = 4;
 
-            // Create Starfield Background
-            function createStarfield() {
-                const starsGeometry = new THREE.BufferGeometry();
-                const starCount = 3000;
-                const positions = new Float32Array(starCount * 3);
-                const colors = new Float32Array(starCount * 3);
-                
-                for (let i = 0; i < starCount * 3; i += 3) {
-                    // Random positions in a sphere around the scene
-                    const radius = 500;
-                    const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.random() * Math.PI;
-                    
-                    positions[i] = radius * Math.sin(phi) * Math.cos(theta);
-                    positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
-                    positions[i + 2] = radius * Math.cos(phi);
-                    
-                    // Star colors - mix of white, blue, and yellow
-                    const colorType = Math.random();
-                    if (colorType < 0.6) {
-                        // White stars
-                        colors[i] = 1;
-                        colors[i + 1] = 1;
-                        colors[i + 2] = 1;
-                    } else if (colorType < 0.8) {
-                        // Blue stars
-                        colors[i] = 0.7;
-                        colors[i + 1] = 0.8;
-                        colors[i + 2] = 1;
-                    } else {
-                        // Yellow/orange stars
-                        colors[i] = 1;
-                        colors[i + 1] = 0.9;
-                        colors[i + 2] = 0.6;
-                    }
-                }
-                
-                starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-                
-                const starsMaterial = new THREE.PointsMaterial({
-                    size: 0.7,
-                    vertexColors: true,
-                    sizeAttenuation: true,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                const starfield = new THREE.Points(starsGeometry, starsMaterial);
-                sceneEarth.add(starfield);
-            }
-            
-            createStarfield();
-
-            // Camera
-            cameraEarth = new THREE.PerspectiveCamera(
-                45,
-                section.offsetWidth / section.offsetHeight,
-                0.1,
-                1000
-            );
-            cameraEarth.position.z = 63; // Zoomed out more
-            cameraEarth.position.y = 4; // Pushed down
-
-            // Renderer - ULTRA MAX HD QUALITY
             rendererEarth = new THREE.WebGLRenderer({
                 canvas: canvas,
                 alpha: true,
@@ -3424,132 +3388,199 @@
                 preserveDrawingBuffer: true
             });
             rendererEarth.setSize(section.offsetWidth, section.offsetHeight);
-            rendererEarth.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Reduced quality
+            rendererEarth.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             rendererEarth.shadowMap.enabled = true;
-            rendererEarth.shadowMap.type = THREE.BasicShadowMap; // Lower quality shadows
+            rendererEarth.shadowMap.type = THREE.PCFSoftShadowMap;
             rendererEarth.toneMapping = THREE.ACESFilmicToneMapping;
-            rendererEarth.toneMappingExposure = 1.5;
-            rendererEarth.outputEncoding = THREE.sRGBEncoding;
-            rendererEarth.physicallyCorrectLights = true;
+            rendererEarth.toneMappingExposure = 1.2;
+            rendererEarth.outputColorSpace = THREE.SRGBColorSpace;
 
-            // Lighting - Dramatic Day/Night effect
-            // Very low ambient - almost black space
-            const ambientLight = new THREE.AmbientLight(0x111111, 0.15);
-            sceneEarth.add(ambientLight);
-
-            // Main sun light - from left side for day lighting
-            const sunLight = new THREE.DirectionalLight(0xffffff, 0.1);
-            sunLight.position.set(-10, 1, 15); // Sun from LEFT side
-            sunLight.castShadow = true;
-            sunLight.shadow.mapSize.width = 2048;
-            sunLight.shadow.mapSize.height = 2048;
-            sunLight.shadow.camera.near = 0.5;
-            sunLight.shadow.camera.far = 500;
-            sunLight.shadow.bias = -0.0001;
-            // Fix shadow camera frustum to cover entire earth
-            sunLight.shadow.camera.left = -50;
-            sunLight.shadow.camera.right = 50;
-            sunLight.shadow.camera.top = 50;
-            sunLight.shadow.camera.bottom = -50;
-            sceneEarth.add(sunLight);
+            // Day/Night Split Lighting
+            sceneEarth.add(new THREE.AmbientLight(0x404040, 0.3)); // Very dim ambient for night side
             
-            // Additional fill light from left for better visibility
-            const fillLight = new THREE.DirectionalLight(0xffffff, 2.1);
-            fillLight.position.set(-50, 10, 10);
-            sceneEarth.add(fillLight);
+            // Day side (right hemisphere) - bright warm light
+            const dayLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            dayLight.position.set(50, 20, 30);
+            sceneEarth.add(dayLight);
             
-            // City lights on night side - warm orange glow
-            const cityLights = new THREE.PointLight(0xffaa33, 0.5, 100);
-            cityLights.position.set(-25, 0, 0);
-            sceneEarth.add(cityLights);
+            // Night side (left hemisphere) - subtle blue moonlight
+            const nightLight = new THREE.DirectionalLight(0x1e3a5f, 0.3);
+            nightLight.position.set(-50, 20, -30);
+            sceneEarth.add(nightLight);
             
-            // Additional city lights
-            const cityLights2 = new THREE.PointLight(0xffbb44, 0.3, 80);
-            cityLights2.position.set(-20, 5, -5);
+            // City lights on night side
+            const cityLights1 = new THREE.PointLight(0xffaa33, 0.8, 60);
+            cityLights1.position.set(-30, 10, 0);
+            sceneEarth.add(cityLights1);
+            
+            const cityLights2 = new THREE.PointLight(0xff8822, 0.6, 50);
+            cityLights2.position.set(-20, 5, 10);
             sceneEarth.add(cityLights2);
+            
+            // Atmospheric glow on terminator (day/night boundary)
+            const terminatorGlow = new THREE.PointLight(0xff9944, 0.4, 40);
+            terminatorGlow.position.set(0, 15, 20);
+            sceneEarth.add(terminatorGlow);
 
-            // Load Earth Model
-            const loader = new GLTFLoader();
-            loader.load('files/earthback.glb', 
-                function(gltf) {
-                    earthModel = gltf.scene;
+            // Create Moving Starfield (like Prima section)
+            function createMovingStarfield() {
+                const starsGeometry = new THREE.BufferGeometry();
+                const starCount = 4000;
+                const positions = new Float32Array(starCount * 3);
+                const colors = new Float32Array(starCount * 3);
+                
+                for (let i = 0; i < starCount * 3; i += 3) {
+                    // Random positions in a large sphere around the scene
+                    const radius = 800;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
                     
-                    // Center the model
-                    const box = new THREE.Box3().setFromObject(earthModel);
-                    const center = box.getCenter(new THREE.Vector3());
-                    earthModel.position.x = -center.x;
-                    earthModel.position.y = -center.y;
-                    earthModel.position.z = -center.z;
+                    positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i + 2] = radius * Math.cos(phi);
                     
-                    // Scale to cover section - VERY BIG
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = 20 / maxDim; // Very large scale
-                    earthModel.scale.set(scale, scale, scale);
-                    
-                    // Enhance materials for ULTRA MAX HD quality
-                    earthModel.traverse((child) => {
-                        if (child.isMesh) {
-                            // Enable high-quality rendering
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                            
-                            if (child.material) {
-                                // Enhance material quality
-                                child.material.needsUpdate = true;
-                                child.material.side = THREE.FrontSide;
-                                
-                                // Maximum anisotropic filtering
-                                const maxAnisotropy = rendererEarth.capabilities.getMaxAnisotropy();
-                                
-                                // Apply to all texture types
-                                if (child.material.map) {
-                                    child.material.map.anisotropy = Math.min(maxAnisotropy, 4);
-                                    child.material.map.minFilter = THREE.LinearFilter;
-                                    child.material.map.magFilter = THREE.LinearFilter;
-                                    child.material.map.needsUpdate = true;
-                                }
-                            }
-                        }
-                    });
-                    
-                    sceneEarth.add(earthModel);
-                    
-                    console.log('✅ Earth background loaded in MAX HD');
-                    
-                    animate();
-                },
-                undefined,
-                function(error) {
-                    console.error('Error loading Earth background:', error);
+                    // White stars with slight variation
+                    const brightness = 0.7 + Math.random() * 0.3;
+                    colors[i] = brightness;
+                    colors[i + 1] = brightness;
+                    colors[i + 2] = brightness;
                 }
-            );
+                
+                starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                const starsMaterial = new THREE.PointsMaterial({
+                    size: 0.6, // Smaller dots
+                    vertexColors: true,
+                    sizeAttenuation: true,
+                    transparent: true,
+                    opacity: 0, // Start invisible for fade-in
+                    depthWrite: false,
+                    depthTest: true
+                });
+                
+                const movingStars = new THREE.Points(starsGeometry, starsMaterial);
+                sceneEarth.add(movingStars);
+                
+                return movingStars;
+            }
+            
+            const movingStars = createMovingStarfield();
+            
+            // Fade in/out animation for stars
+            let starOpacity = 0;
+            let fadeInSpeed = 0.008;
+            let fadeOutSpeed = 0.012;
+            let fadeStarted = false;
+            let isFadingIn = false;
+            let isFadingOut = false;
+            
+            function fadeInStars() {
+                isFadingIn = true;
+                isFadingOut = false;
+                if (starOpacity < 0.9) {
+                    starOpacity += fadeInSpeed;
+                    if (movingStars) {
+                        movingStars.material.opacity = starOpacity;
+                    }
+                    requestAnimationFrame(fadeInStars);
+                } else {
+                    isFadingIn = false;
+                }
+            }
+            
+            function fadeOutStars() {
+                isFadingOut = true;
+                isFadingIn = false;
+                if (starOpacity > 0) {
+                    starOpacity -= fadeOutSpeed;
+                    if (movingStars) {
+                        movingStars.material.opacity = Math.max(0, starOpacity);
+                    }
+                    requestAnimationFrame(fadeOutStars);
+                } else {
+                    isFadingOut = false;
+                }
+            }
+
+            // Draco Loader
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
+            const loader = new GLTFLoader();
+            loader.setDRACOLoader(dracoLoader);
+
+            // Use original file for better quality
+            loader.load('files/earthback.glb', function(gltf) {
+                earthModel = gltf.scene;
+                const box = new THREE.Box3().setFromObject(earthModel);
+                earthModel.position.sub(box.getCenter(new THREE.Vector3()));
+                
+                // Scale the Earth model for better visibility
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 50 / maxDim; // Increased scale for better Earth visibility
+                earthModel.scale.set(scale, scale, scale);
+                
+                // Enhance materials for MAX HD quality + Day/Night effect
+                earthModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        
+                        if (child.material) {
+                            child.material.needsUpdate = true;
+                            
+                            const maxAnisotropy = rendererEarth.capabilities.getMaxAnisotropy();
+                            
+                            if (child.material.map) {
+                                child.material.map.anisotropy = Math.min(maxAnisotropy, 16);
+                                child.material.map.minFilter = THREE.LinearFilter;
+                                child.material.map.magFilter = THREE.LinearFilter;
+                                child.material.map.needsUpdate = true;
+                            }
+                            if (child.material.normalMap) {
+                                child.material.normalMap.anisotropy = Math.min(maxAnisotropy, 16);
+                                child.material.normalMap.minFilter = THREE.LinearFilter;
+                                child.material.normalMap.magFilter = THREE.LinearFilter;
+                                child.material.normalMap.needsUpdate = true;
+                            }
+                            
+                            // Add subtle emissive for night side glow
+                            child.material.emissive = new THREE.Color(0x0a0a20);
+                            child.material.emissiveIntensity = 0.1;
+                        }
+                    }
+                });
+                
+                sceneEarth.add(earthModel);
+                
+                // Start star fade-in immediately after Earth loads
+                if (!fadeStarted) {
+                    fadeStarted = true;
+                    fadeInStars();
+                }
+                
+                animate();
+            });
 
             function animate() {
                 requestAnimationFrame(animate);
-                
                 if (earthModel) {
-                    // Slow rotation
-                    earthModel.rotation.y += 0.001;
-                    earthModel.rotation.x = Math.sin(Date.now() * 0.0001) * 0.1;
+                    earthModel.rotation.y += 0.0002;
+                }
+                
+                // Animate moving stars (slower movement)
+                if (movingStars) {
+                    movingStars.rotation.y += 0.0001; // Much slower
+                    movingStars.rotation.x += 0.00005; // Much slower
                 }
                 
                 rendererEarth.render(sceneEarth, cameraEarth);
             }
-
-            // Handle window resize
-            window.addEventListener('resize', () => {
-                const width = section.offsetWidth;
-                const height = section.offsetHeight;
-                
-                cameraEarth.aspect = width / height;
-                cameraEarth.updateProjectionMatrix();
-                
-                rendererEarth.setSize(width, height);
-            });
         }
 
-        // Initialize
+        // Immediate Loading - Start Earth Background on page load
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initEarthBackground);
         } else {
@@ -3557,20 +3588,20 @@
         }
     </script>
 
-    <!-- Background2 3D Model Script -->
+    <!-- REPLACED BACKGROUND2 SCRIPT -->
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-        console.log('🎨 Background2 model loading...');
-        
         let sceneBackground2, cameraBackground2, rendererBackground2, background2Model;
-        let background2Starfield; // rotating star shell like Earth background
+        let background2Starfield;
+        let background2Loaded = false;
 
         function initBackground2() {
-            console.log('🎨 initBackground2 called');
-            console.log('Performance mode:', localStorage.getItem(PERFORMANCE_MODE_KEY));
-            
+            if(background2Loaded) return;
+            background2Loaded = true;
+
             // Skip if performance mode is enabled
             if (localStorage.getItem(PERFORMANCE_MODE_KEY) === 'true') {
                 console.log('⚡ Performance mode enabled - skipping background2 loading');
@@ -3671,9 +3702,15 @@
             directionalLight.shadow.mapSize.height = 2048;
             sceneBackground2.add(directionalLight);
 
-            // Load Background2 Model
+            // Draco Loader
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
             const loader = new GLTFLoader();
-            loader.load('files/background2.glb', 
+            loader.setDRACOLoader(dracoLoader);
+
+            // UPDATED PATH: files/compressed/
+            loader.load('files/compressed/background2.glb', 
                 function(gltf) {
                     background2Model = gltf.scene;
                     
@@ -3919,11 +3956,18 @@
             window.addEventListener('scroll', updateCanvasOpacity, { passive: true });
         }
 
-        // Initialize
+        // Immediate Loading - Start Background2 on page load
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initBackground2);
         } else {
             initBackground2();
+        }
+
+        // Immediate Loading - Start ESP32 on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initESP32Parallax);
+        } else {
+            initESP32Parallax();
         }
     </script>
 
