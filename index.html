@@ -97,9 +97,12 @@
             window.scrollTo(0, 0);
         });
         
+        // Global mobile detection cache
+        const IS_MOBILE = window.innerWidth <= 768;
+
         // Smooth Scrolling Effect (desktop only, disabled on mobile & performance mode)
         (function() {
-            const isMobile = window.innerWidth <= 768;
+            const isMobile = IS_MOBILE;
             const isPerformanceMode = (typeof isPerformanceModeEnabled !== 'undefined')
                 ? isPerformanceModeEnabled
                 : (localStorage.getItem('cv_performance_mode') === 'true');
@@ -245,7 +248,7 @@
             });
         });
     </script>
-    <!-- Advanced View Counter -->
+    <!-- Smart Device View Counter -->
     <div class="view-counter">
         <div class="counter-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -256,7 +259,7 @@
         <div class="counter-content">
             <div class="counter-label">Profile Views</div>
             <div class="counter-number" id="viewCount">0</div>
-            <div class="counter-sublabel">Unique Visitors</div>
+            <div class="counter-sublabel">Unique Devices</div>
         </div>
     </div>
 
@@ -291,6 +294,13 @@
             }
         });
 
+        // Cached sections to prevent repeated DOM queries
+        const cachedSections = {
+            earth: document.getElementById('projects-section-2'),
+            prima: document.getElementById('projects-section-3'),
+            smartHome: document.getElementById('projects-section')
+        };
+
         // Consolidated function for view counter and language selector color transitions
         function updateCounterAndLanguageSelectorColor() {
             const viewCounter = document.querySelector('.view-counter');
@@ -302,36 +312,31 @@
 
             if (!viewCounter) return;
 
-            // Get sections with dark backgrounds
-            const earthSection = document.getElementById('projects-section-2');
-            const primaSection = document.getElementById('projects-section-3');
-            const smartHomeSection = document.getElementById('projects-section'); // Fix Smart Home section ID
-
             let isOverDarkSection = false;
+            const windowHeight = window.innerHeight;
+            const visibleTop = windowHeight * 0.7;
+            const visibleBottom = windowHeight * 0.3;
 
             // Check if view counter is over Earth section
-            if (earthSection) {
-                const rect = earthSection.getBoundingClientRect();
-                // Transition earlier - start when section is 70% visible
-                if (rect.top < window.innerHeight * 0.7 && rect.bottom > window.innerHeight * 0.3) {
+            if (cachedSections.earth) {
+                const rect = cachedSections.earth.getBoundingClientRect();
+                if (rect.top < visibleTop && rect.bottom > visibleBottom) {
                     isOverDarkSection = true;
                 }
             }
 
             // Check if view counter is over PRIMA section (dark blue background)
-            if (primaSection) {
-                const rect = primaSection.getBoundingClientRect();
-                // Transition earlier - start when section is 70% visible
-                if (rect.top < window.innerHeight * 0.7 && rect.bottom > window.innerHeight * 0.3) {
+            if (cachedSections.prima) {
+                const rect = cachedSections.prima.getBoundingClientRect();
+                if (rect.top < visibleTop && rect.bottom > visibleBottom) {
                     isOverDarkSection = true;
                 }
             }
 
             // Check if view counter is over Smart Home section (dark background)
-            if (smartHomeSection) {
-                const rect = smartHomeSection.getBoundingClientRect();
-                // Transition earlier - start when section is 70% visible
-                if (rect.top < window.innerHeight * 0.7 && rect.bottom > window.innerHeight * 0.3) {
+            if (cachedSections.smartHome) {
+                const rect = cachedSections.smartHome.getBoundingClientRect();
+                if (rect.top < visibleTop && rect.bottom > visibleBottom) {
                     isOverDarkSection = true;
                 }
             }
@@ -352,8 +357,17 @@
             }
         }
 
-        // Update on scroll
-        window.addEventListener('scroll', updateCounterAndLanguageSelectorColor, { passive: true });
+        // Optimized scroll handling - single throttled listener
+        let scrollThrottleTimer;
+        function throttledScrollHandler() {
+            if (!scrollThrottleTimer) {
+                scrollThrottleTimer = setTimeout(() => {
+                    updateCounterAndLanguageSelectorColor();
+                    scrollThrottleTimer = null;
+                }, 16); // 60fps throttle
+            }
+        }
+        window.addEventListener('scroll', throttledScrollHandler, { passive: true });
         // Initial update
         updateCounterAndLanguageSelectorColor();
     </script>
@@ -380,95 +394,182 @@
             tooltip.classList.toggle('show');
         }
     </script>
+    
     <script>
-        // Backend Configuration
-        const BACKEND_URL = 'https://cv-backend-fzp9.onrender.com';
+        // Smart Device Tracking System - No Backend Required
+        class DeviceTracker {
+            constructor() {
+                this.storageKey = 'cv_device_tracker';
+                this.devicesKey = 'cv_unique_devices';
+                this.currentDeviceId = null;
+                this.init();
+            }
 
-        // Advanced Browser Fingerprinting for Unique Visitor Tracking
-        async function generateDeviceFingerprint() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.textBaseline = 'top';
-            ctx.font = '14px Arial';
-            ctx.fillText('fingerprint', 2, 2);
-            const canvasData = canvas.toDataURL();
-            
-            const fingerprint = {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                platform: navigator.platform,
-                screenResolution: `${screen.width}x${screen.height}`,
-                colorDepth: screen.colorDepth,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                canvas: canvasData,
-                plugins: Array.from(navigator.plugins).map(p => p.name).join(','),
-                hardwareConcurrency: navigator.hardwareConcurrency,
-                deviceMemory: navigator.deviceMemory || 'unknown'
-            };
-            
-            const fingerprintString = JSON.stringify(fingerprint);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fingerprintString));
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        async function trackVisitor() {
-            try {
-                const fingerprint = await generateDeviceFingerprint();
+            // Generate unique device fingerprint
+            generateDeviceFingerprint() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.textBaseline = 'top';
+                ctx.font = '14px Arial';
+                ctx.fillText('Device fingerprint', 2, 2);
                 
-                // Send fingerprint to backend
-                const response = await fetch(`${BACKEND_URL}/api/track-visitor`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ fingerprint })
-                });
+                const fingerprint = [
+                    navigator.userAgent,
+                    navigator.language,
+                    screen.width + 'x' + screen.height,
+                    screen.colorDepth,
+                    new Date().getTimezoneOffset(),
+                    canvas.toDataURL(),
+                    navigator.hardwareConcurrency || 'unknown',
+                    navigator.deviceMemory || 'unknown',
+                    navigator.platform
+                ].join('|');
                 
-                if (!response.ok) {
-                    throw new Error(`Backend error: ${response.status}`);
+                // Simple hash function
+                let hash = 0;
+                for (let i = 0; i < fingerprint.length; i++) {
+                    const char = fingerprint.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // Convert to 32-bit integer
                 }
                 
-                const data = await response.json();
-                
-                // Animate counter with global unique visitor count
-                animateCounter(data.uniqueVisitors);
-                
-                // Log tracking info
-                if (data.isNewVisitor) {
-                    console.log('🆕 New unique visitor detected');
-                } else {
-                    console.log('🔄 Returning visitor detected');
+                return 'device_' + Math.abs(hash).toString(36);
+            }
+
+            // Initialize tracking
+            init() {
+                this.currentDeviceId = this.generateDeviceFingerprint();
+                this.trackDevice();
+            }
+
+            // Track device visit
+            trackDevice() {
+                try {
+                    // Get existing devices data
+                    const devicesData = localStorage.getItem(this.devicesKey);
+                    let devices = devicesData ? JSON.parse(devicesData) : {};
+                    
+                    // Get current device data
+                    const currentDeviceData = localStorage.getItem(this.storageKey);
+                    let deviceInfo = currentDeviceData ? JSON.parse(currentDeviceData) : null;
+                    
+                    // Check if this is a new device
+                    const isNewDevice = !devices[this.currentDeviceId];
+                    
+                    if (isNewDevice) {
+                        // Add new device to registry
+                        devices[this.currentDeviceId] = {
+                            firstVisit: new Date().toISOString(),
+                            lastVisit: new Date().toISOString(),
+                            visitCount: 1,
+                            userAgent: navigator.userAgent,
+                            screen: `${screen.width}x${screen.height}`,
+                            language: navigator.language
+                        };
+                        
+                        console.log('🆕 New unique device detected:', this.currentDeviceId.substring(0, 12) + '...');
+                    } else {
+                        // Update existing device
+                        devices[this.currentDeviceId].lastVisit = new Date().toISOString();
+                        devices[this.currentDeviceId].visitCount++;
+                        console.log('🔄 Returning device detected:', this.currentDeviceId.substring(0, 12) + '...');
+                    }
+                    
+                    // Save devices registry
+                    localStorage.setItem(this.devicesKey, JSON.stringify(devices));
+                    
+                    // Save current device info
+                    deviceInfo = {
+                        deviceId: this.currentDeviceId,
+                        lastVisit: new Date().toISOString(),
+                        visitCount: devices[this.currentDeviceId].visitCount
+                    };
+                    localStorage.setItem(this.storageKey, JSON.stringify(deviceInfo));
+                    
+                    // Update counter with total unique devices
+                    const uniqueDeviceCount = Object.keys(devices).length;
+                    this.animateCounter(uniqueDeviceCount);
+                    
+                    console.log(` Device tracking: ${uniqueDeviceCount} unique devices | Current device visits: ${devices[this.currentDeviceId].visitCount}`);
+                    
+                    // No cleanup - keep all historical devices forever
+                    
+                } catch (error) {
+                    console.error('Error tracking device:', error);
+                    // Fallback: show at least 1
+                    this.animateCounter(1);
                 }
+            }
+
+            
+            // Animate counter
+            animateCounter(targetValue) {
+                const counterElement = document.getElementById('viewCount');
+                if (!counterElement) return;
                 
-                console.log(`📊 Visitor tracked: ${fingerprint.substring(0, 8)}... | Unique visitors: ${data.uniqueVisitors} | Total views: ${data.totalViews}`);
+                const startValue = parseInt(counterElement.textContent) || 0;
+                const duration = 1500;
+                const startTime = performance.now();
                 
-                return data.uniqueVisitors;
-            } catch (error) {
-                console.error('Error tracking visitor:', error);
-                // Fallback: show at least 1
-                animateCounter(1);
+                const animate = (currentTime) => {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Easing function for smooth animation
+                    const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+                    const currentValue = Math.floor(startValue + (targetValue - startValue) * easeOutQuart);
+                    
+                    counterElement.textContent = currentValue.toLocaleString();
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    }
+                };
+                
+                requestAnimationFrame(animate);
+            }
+
+            // Get device statistics
+            getStats() {
+                const devicesData = localStorage.getItem(this.devicesKey);
+                const devices = devicesData ? JSON.parse(devicesData) : {};
+                
+                return {
+                    totalDevices: Object.keys(devices).length,
+                    devices: devices,
+                    currentDeviceId: this.currentDeviceId
+                };
             }
         }
 
-        function animateCounter(targetValue) {
-            const counterElement = document.getElementById('viewCount');
-            let currentValue = 0;
-            const duration = 2000; // 2 seconds
-            const increment = targetValue / (duration / 16); // 60fps
+        // Initialize device tracker on page load
+        let deviceTracker;
+        window.addEventListener('DOMContentLoaded', () => {
+            deviceTracker = new DeviceTracker();
             
-            const timer = setInterval(() => {
-                currentValue += increment;
-                if (currentValue >= targetValue) {
-                    currentValue = targetValue;
-                    clearInterval(timer);
-                }
-                counterElement.textContent = Math.floor(currentValue).toLocaleString();
-            }, 16);
-        }
-
-        // Initialize on page load
-        window.addEventListener('DOMContentLoaded', trackVisitor);
+            // Make it available globally for debugging
+            window.deviceTracker = deviceTracker;
+            
+            // Add debug commands
+            window.showDeviceStats = () => {
+                const stats = deviceTracker.getStats();
+                console.group('📊 Device Tracking Stats');
+                console.log('Total unique devices:', stats.totalDevices);
+                console.log('Current device ID:', stats.currentDeviceId);
+                console.log('All devices:', stats.devices);
+                console.groupEnd();
+            };
+            
+            window.clearDeviceData = () => {
+                localStorage.removeItem('cv_device_tracker');
+                localStorage.removeItem('cv_unique_devices');
+                console.log('⚠️ All historical device data cleared - use with caution!');
+            };
+            
+            console.log('🔧 Debug commands available:');
+            console.log('  showDeviceStats() - Show tracking statistics');
+            console.log('  clearDeviceData() - Clear all tracking data');
+        });
     </script>
 
     <!-- Smooth Marquee Fade Away on Scroll -->
@@ -712,10 +813,10 @@
                                 <img src="files/frenchflag.jpg" alt="French" class="flag-icon">
                                 French
                             </span>
-                            <span class="language-level">Fluent</span>
+                            <span class="language-level">Medium</span>
                         </div>
                         <div class="language-progress">
-                            <div class="language-fill" style="width: 95%"></div>
+                            <div class="language-fill" style="width: 75%"></div>
                         </div>
                     </div>
                     <div class="language-item">
@@ -724,10 +825,10 @@
                                 <img src="files/unitedstates.webp" alt="English" class="flag-icon">
                                 English
                             </span>
-                            <span class="language-level">Advanced</span>
+                            <span class="language-level">Medium</span>
                         </div>
                         <div class="language-progress">
-                            <div class="language-fill" style="width: 85%"></div>
+                            <div class="language-fill" style="width: 75%"></div>
                         </div>
                     </div>
                     <div class="language-item">
@@ -736,10 +837,10 @@
                                  <img src="files/Flag-Spain.webp" alt="Spanish" class="flag-icon">
                                  Spanish
                              </span>
-                             <span class="language-level">Intermediate</span>
+                             <span class="language-level">Very Basic</span>
                          </div>
                          <div class="language-progress">
-                             <div class="language-fill" style="width: 60%"></div>
+                             <div class="language-fill" style="width: 40%"></div>
                          </div>
                      </div>
                     </div>
@@ -756,7 +857,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per html">
-                            <span class="tooltip">50%</span>
+                            <span class="tooltip">45%</span>
                         </span>
                     </div>
                 </div>
@@ -770,7 +871,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per css">
-                            <span class="tooltip">70%</span>
+                            <span class="tooltip">50%</span>
                         </span>
                     </div>
                 </div>
@@ -784,7 +885,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per javascript">
-                            <span class="tooltip">50%</span>
+                            <span class="tooltip">40%</span>
                         </span>
                     </div>
                 </div>
@@ -811,8 +912,8 @@
                         <span class="title">TypeScript</span>
                     </div>
                     <div class="skill-bar">
-                        <span class="skill-per" style="width: 55%; background: #3178C6;">
-                            <span class="tooltip">55%</span>
+                        <span class="skill-per" style="width: 50%; background: #3178C6;">
+                            <span class="tooltip">40%</span>
                         </span>
                     </div>
                 </div>
@@ -826,7 +927,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 60%; background: #CC6699;">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -840,7 +941,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 65%; background: #42B883;">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">20%</span>
                         </span>
                     </div>
                 </div>
@@ -857,7 +958,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per git">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -871,7 +972,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per react">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -958,7 +1059,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per arduino">
-                            <span class="tooltip">75%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -972,7 +1073,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per esp32">
-                            <span class="tooltip">80%</span>
+                            <span class="tooltip">75%</span>
                         </span>
                     </div>
                 </div>
@@ -986,7 +1087,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per cpp">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -1014,7 +1115,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 60%; background: #03234B;">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -1028,7 +1129,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 65%; background: #2B2728;">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -1056,7 +1157,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 60%; background: #00A8E1;">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -1073,7 +1174,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per sensors">
-                            <span class="tooltip">85%</span>
+                            <span class="tooltip">75%</span>
                         </span>
                     </div>
                 </div>
@@ -1087,7 +1188,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per pcb">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -1101,7 +1202,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per wireless">
-                            <span class="tooltip">75%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -1129,7 +1230,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 75%; background: #FF6B35;">
-                            <span class="tooltip">75%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -1157,7 +1258,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 65%; background: #1ABC9C;">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -1188,7 +1289,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 65%; background: #000000;">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -1202,7 +1303,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 80%; background: #000000;">
-                            <span class="tooltip">80%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -1216,7 +1317,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 75%; background: #000000;">
-                            <span class="tooltip">75%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -1230,7 +1331,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 85%; background: #2B579A;">
-                            <span class="tooltip">85%</span>
+                            <span class="tooltip">75%</span>
                         </span>
                     </div>
                 </div>
@@ -1275,7 +1376,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 75%; background: #000000;">
-                            <span class="tooltip">75%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -1303,7 +1404,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 60%; background: #000000;">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -1334,7 +1435,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 65%; background: #000000;">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -1379,7 +1480,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 75%; background: #31A8FF;">
-                            <span class="tooltip">75%</span>
+                            <span class="tooltip">70%</span>
                         </span>
                     </div>
                 </div>
@@ -1435,7 +1536,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 65%; background: #FF9A00;">
-                            <span class="tooltip">65%</span>
+                            <span class="tooltip">60%</span>
                         </span>
                     </div>
                 </div>
@@ -1449,7 +1550,7 @@
                     </div>
                     <div class="skill-bar">
                         <span class="skill-per" style="width: 60%; background: #FF3366;">
-                            <span class="tooltip">60%</span>
+                            <span class="tooltip">55%</span>
                         </span>
                     </div>
                 </div>
@@ -1808,7 +1909,7 @@
                             </p>
                             
                             <p class="presentation-paragraph">
-                                Based in <strong>Kelibia, Tunisia</strong>. Fluent in Arabic, French, and English. Available for remote or on-site opportunities.
+                                Based in <strong>Kelibia, Tunisia</strong>. Native in Arabic, Medium in French and English, Basic in Spanish. Available for remote or on-site opportunities.
                             </p>
                         </div>
                     </div>
@@ -2773,7 +2874,7 @@
     <script type="module">
         import * as THREE from 'three';
 
-        const isMobile = window.innerWidth <= 768;
+        const isMobile = IS_MOBILE;
         const overlay = document.getElementById('global-loading-overlay');
         const progressText = document.getElementById('loading-progress-text');
         const progressBar = document.getElementById('progress-bar');
@@ -2785,58 +2886,33 @@
         }
 
         let currentProgress = 0;
-        let targetProgress = 0;
-        let animationFrameId = null;
         let lastLoggedProgress = -1; // Track last logged value to avoid spam
 
-        function smoothUpdateProgress() {
-            // Clamp target between 0 and 100 to avoid overshooting
-            const maxTarget = Math.max(0, Math.min(targetProgress, 100));
-
-            if (currentProgress < maxTarget) {
-                // Smooth easing towards target
-                const diff = maxTarget - currentProgress;
-                currentProgress += diff * 0.15; // Responsive easing factor
-
-                if (currentProgress > maxTarget - 0.5) {
-                    currentProgress = maxTarget;
-                }
-            } else if (currentProgress > maxTarget) {
-                // If target moved backwards (rare), snap down to it
-                currentProgress = maxTarget;
-            }
-
+        function updateProgressBar() {
+            // Use REAL loading progress, no fake animation
             if (progressBar) {
                 progressBar.style.width = currentProgress + '%';
             }
 
-            // Log only when integer percentage changes to avoid spam and "stuck" feeling
+            // Log only when integer percentage changes
             const rounded = Math.round(currentProgress);
             if (rounded !== lastLoggedProgress) {
                 console.log(`Loading progress: ${rounded}%`);
                 lastLoggedProgress = rounded;
-            }
-
-            if (currentProgress < maxTarget && currentProgress < 100) {
-                animationFrameId = requestAnimationFrame(smoothUpdateProgress);
-            } else {
-                animationFrameId = null;
             }
         }
 
         function updateProgress(itemsLoaded, itemsTotal) {
             if (!progressBar || !itemsTotal) return;
 
-            // Calculate actual progress percentage and clamp to [0, 100]
-            const raw = (itemsLoaded / itemsTotal) * 100;
-            targetProgress = Math.max(0, Math.min(raw, 100));
+            // Use REAL loading progress directly
+            currentProgress = (itemsLoaded / itemsTotal) * 100;
+            currentProgress = Math.max(0, Math.min(currentProgress, 100));
 
-            console.log(`Items loaded: ${itemsLoaded}/${itemsTotal} = ${Math.round(targetProgress)}%`);
+            console.log(`Items loaded: ${itemsLoaded}/${itemsTotal} = ${Math.round(currentProgress)}%`);
 
-            // Start animation loop if not already running
-            if (!animationFrameId) {
-                animationFrameId = requestAnimationFrame(smoothUpdateProgress);
-            }
+            // Update progress bar immediately with real progress
+            updateProgressBar();
         }
 
         // Override the default loading manager with more accurate tracking
@@ -2855,36 +2931,18 @@
             
             console.log(`✅ All assets loaded successfully!`);
             
-            // Ensure progress bar reaches 100%
-            targetProgress = 100;
-            currentProgress = Math.max(currentProgress, 95);
+            // Set to 100% and hide immediately
+            currentProgress = 100;
+            updateProgressBar();
             
-            // Final animation to 100%
-            const finalAnimation = () => {
-                if (currentProgress < 100) {
-                    currentProgress += (100 - currentProgress) * 0.2;
-                    if (progressBar) {
-                        progressBar.style.width = currentProgress + '%';
-                    }
-                    requestAnimationFrame(finalAnimation);
-                } else {
-                    currentProgress = 100;
-                    if (progressBar) {
-                        progressBar.style.width = '100%';
-                    }
-                    
-                    console.log(`🎉 Progress bar completed at 100%`);
-                    
-                    // Hide overlay after a brief delay
-                    setTimeout(() => {
-                        overlay.classList.add('hide');
-                        document.body.classList.remove('loading');
-                        console.log(`👁️ Loading overlay hidden`);
-                    }, 300);
-                }
-            };
+            console.log(`🎉 Progress bar completed at 100%`);
             
-            finalAnimation();
+            // Hide overlay after a brief delay
+            setTimeout(() => {
+                overlay.classList.add('hide');
+                document.body.classList.remove('loading');
+                console.log(`👁️ Loading overlay hidden`);
+            }, 300);
         }
 
         manager.onLoad = function () {
@@ -2912,7 +2970,7 @@
             }, 100); // Minimal delay
         }
 
-        console.log(`🚀 Loading manager initialized - tracking real file downloads`);
+        console.log(`🚀 Loading manager initialized - tracking REAL model loading progress`);
     </script>
 
     <!-- Video Play Button Script -->
@@ -2974,7 +3032,7 @@
             const canvas = document.getElementById('smartHomeCanvas');
             if (!canvas) return;
 
-            if (window.innerWidth <= 768) {
+            if (IS_MOBILE) {
                 const container = canvas.parentElement;
                 if (container) container.style.display = 'none';
                 canvas.style.display = 'none';
@@ -2988,7 +3046,7 @@
 
             rendererHome = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
             rendererHome.setSize(canvas.parentElement.clientWidth, canvas.parentElement.clientHeight);
-            rendererHome.setPixelRatio(window.devicePixelRatio);
+            rendererHome.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
             // Lights
             sceneHome.add(new THREE.AmbientLight(0xffffff, 0.8));
@@ -3049,33 +3107,32 @@
                 controls.update();
                 
                 if (smartHome) {
-                    // Gentle floating animation
-                    const floatTime = Date.now() * 0.001;
-                    smartHome.position.y = Math.sin(floatTime * 0.5) * 0.05;
+                    // Gentle floating animation (optimized)
+                    const time = Date.now() * 0.0005; // Pre-multiply by 0.5
+                    smartHome.position.y = Math.sin(time) * 0.05;
                 }
                 
                 rendererHome.render(sceneHome, cameraHome);
             }
 
-            // Resize handler
+            // Throttled resize handler
+            let resizeTimeout;
             window.addEventListener('resize', () => {
-                const container = canvas.parentElement;
-                if (container) {
-                    const width = container.clientWidth;
-                    const height = container.clientHeight;
-                    cameraHome.aspect = width / height;
-                    cameraHome.updateProjectionMatrix();
-                    rendererHome.setSize(width, height);
-                }
+                if (resizeTimeout) clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const container = canvas.parentElement;
+                    if (container) {
+                        const width = container.clientWidth;
+                        const height = container.clientHeight;
+                        cameraHome.aspect = width / height;
+                        cameraHome.updateProjectionMatrix();
+                        rendererHome.setSize(width, height);
+                    }
+                }, 100); // 100ms throttle
             });
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            if (smartHome) smartHome.position.y = Math.sin(Date.now() * 0.001 * 0.5) * 0.05;
-            rendererHome.render(sceneHome, cameraHome);
-        }
+        // Duplicate animate function removed - using the one inside initSmartHome3D
 
         // Immediate Loading - Start Smart Home on page load
         if (document.readyState === 'loading') {
@@ -3152,7 +3209,7 @@
 
             renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
             renderer.setSize(150, 150);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
             // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -3195,8 +3252,8 @@
         function animate() {
             requestAnimationFrame(animate);
             if (drone) {
-                const time = Date.now() * 0.001;
-                drone.position.y = Math.sin(time * 0.5) * 0.1;
+                const time = Date.now() * 0.0005; // Pre-multiply by 0.5
+                drone.position.y = Math.sin(time) * 0.1;
                 drone.rotation.y += 0.0005;
 
                 // Scroll velocity logic
@@ -3269,7 +3326,7 @@
 
             rendererESP = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
             rendererESP.setSize(300, 300);
-            rendererESP.setPixelRatio(window.devicePixelRatio);
+            rendererESP.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
             sceneESP.add(new THREE.AmbientLight(0xffffff, 0.8));
             const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(5, 10, 5); sceneESP.add(dl);
@@ -3306,6 +3363,8 @@
             }
 
             function updateParallax() {
+                if (!esp32Model || !esp32Model.scale) return;
+                
                 const rect = projectsSection.getBoundingClientRect();
                 const start = window.innerHeight * 1.2;
                 const end = window.innerHeight * 0.2;
@@ -3321,14 +3380,26 @@
 
                 const scrollRel = Math.max(0, window.pageYOffset - (projectsSection.offsetTop - window.innerHeight));
                 esp32Model.rotation.y = scrollRel * 0.004;
-                esp32Model.rotation.x = Math.sin(scrollRel * 0.002) * 0.3;
+                esp32Model.rotation.x = Math.sin(scrollRel * 0.002) * 0.3; // Pre-multiplied for efficiency
                 
-                esp32Model.traverse(c => { if(c.material) c.material.opacity = Math.max(0, (eased - 0.4) / 0.6); });
+                // Cache materials to avoid traversal every frame
+                if (!esp32Model.cachedMaterials) {
+                    esp32Model.cachedMaterials = [];
+                    esp32Model.traverse(c => { 
+                        if(c.material) esp32Model.cachedMaterials.push(c.material); 
+                    });
+                }
+                
+                // Update cached materials directly
+                const opacity = Math.max(0, (eased - 0.4) / 0.6);
+                esp32Model.cachedMaterials.forEach(material => {
+                    material.opacity = opacity;
+                });
             }
 
             // Update on scroll
             window.addEventListener('scroll', () => {
-                if (esp32Model) {
+                if (esp32Model && esp32Model.scale) {
                     updateParallax();
                 }
             }, { passive: true });
@@ -3368,7 +3439,7 @@
             const section = document.getElementById('projects-section-2');
             if (!canvas || !section) return;
 
-            if (window.innerWidth <= 768) {
+            if (IS_MOBILE) {
                 canvas.style.display = 'none';
                 return;
             }
@@ -3384,8 +3455,7 @@
                 antialias: true,
                 powerPreference: 'high-performance',
                 precision: 'highp',
-                logarithmicDepthBuffer: true,
-                preserveDrawingBuffer: true
+                logarithmicDepthBuffer: true
             });
             rendererEarth.setSize(section.offsetWidth, section.offsetHeight);
             rendererEarth.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -3510,8 +3580,8 @@
             const loader = new GLTFLoader();
             loader.setDRACOLoader(dracoLoader);
 
-            // Use original file for better quality
-            loader.load('files/earthback.glb', function(gltf) {
+            // Use optimized compressed Earth file (85.8% smaller, VERY HIGH quality - 3072px textures)
+            loader.load('files/compressed/earthback.glb', function(gltf) {
                 earthModel = gltf.scene;
                 const box = new THREE.Box3().setFromObject(earthModel);
                 earthModel.position.sub(box.getCenter(new THREE.Vector3()));
@@ -3616,7 +3686,7 @@
                 return;
             }
 
-            if (window.innerWidth <= 768) {
+            if (IS_MOBILE) {
                 canvas.style.display = 'none';
                 return;
             }
@@ -3679,8 +3749,7 @@
                 antialias: true,
                 powerPreference: 'high-performance',
                 precision: 'highp',
-                logarithmicDepthBuffer: true,
-                preserveDrawingBuffer: true
+                logarithmicDepthBuffer: true
             });
             rendererBackground2.setSize(section.offsetWidth, section.offsetHeight);
             rendererBackground2.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -3688,7 +3757,7 @@
             rendererBackground2.shadowMap.type = THREE.BasicShadowMap;
             rendererBackground2.toneMapping = THREE.ACESFilmicToneMapping;
             rendererBackground2.toneMappingExposure = 1.5;
-            rendererBackground2.outputEncoding = THREE.sRGBEncoding;
+            rendererBackground2.outputColorSpace = THREE.SRGBColorSpace;
             rendererBackground2.physicallyCorrectLights = true;
 
             // Lighting
@@ -3963,12 +4032,7 @@
             initBackground2();
         }
 
-        // Immediate Loading - Start ESP32 on page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initESP32Parallax);
-        } else {
-            initESP32Parallax();
-        }
+        // ESP32 Parallax is already initialized in its module above
     </script>
 
     <!-- Performance Mode Toggle Script -->
