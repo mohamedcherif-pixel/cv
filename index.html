@@ -11,7 +11,9 @@
     {
         "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+            "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
         }
     }
     </script>
@@ -395,248 +397,129 @@
         }
     </script>
     
-    <script>
-        // Smart Device Tracking System - No Backend Required
-        class DeviceTracker {
+    <!-- Firebase Global Visitor Tracker -->
+    <script type="module">
+        import { initializeApp } from 'firebase/app';
+        import { getDatabase, ref, runTransaction, onValue } from 'firebase/database';
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcADueAQjsqstEjfK_zvwvMt6FqB1MVO8",
+            authDomain: "my-portfolio-views.firebaseapp.com",
+            databaseURL: "https://my-portfolio-views-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "my-portfolio-views",
+            storageBucket: "my-portfolio-views.firebasestorage.app",
+            messagingSenderId: "696738988672",
+            appId: "1:696738988672:web:b66028a4cd99aafd46dc65",
+            measurementId: "G-QR95YQ2H79"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        class FirebaseTracker {
             constructor() {
-                this.storageKey = 'cv_device_tracker';
-                this.devicesKey = 'cv_unique_devices';
-                this.currentDeviceId = null;
+                this.viewRef = ref(db, 'portfolio/views');
                 this.init();
             }
 
-            // Generate unique device fingerprint
-            generateDeviceFingerprint() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                ctx.textBaseline = 'top';
-                ctx.font = '14px Arial';
-                ctx.fillText('Device fingerprint', 2, 2);
-                
-                // Enhanced fingerprinting with more unique factors
-                const fingerprintData = {
-                    userAgent: navigator.userAgent,
-                    language: navigator.language,
-                    languages: navigator.languages ? navigator.languages.join(',') : 'unknown',
-                    screen: screen.width + 'x' + screen.height,
-                    colorDepth: screen.colorDepth,
-                    pixelDepth: screen.pixelDepth || screen.colorDepth,
-                    timezone: new Date().getTimezoneOffset(),
-                    canvas: canvas.toDataURL(),
-                    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-                    deviceMemory: navigator.deviceMemory || 'unknown',
-                    platform: navigator.platform,
-                    vendor: navigator.vendor || 'unknown',
-                    maxTouchPoints: navigator.maxTouchPoints || 0,
-                    isFirefox: typeof InstallTrigger !== 'undefined' ? 'firefox' : 'other',
-                    isChrome: typeof chrome !== 'undefined' ? 'chrome' : 'other',
-                    isSafari: typeof safari !== 'undefined' ? 'safari' : 'other',
-                    performance: performance.now(),
-                    randomSession: Math.random().toString(36).substr(2, 9),
-                    orientation: screen.orientation ? screen.orientation.type : 'unknown',
-                    canvasJPEG: canvas.toDataURL('image/jpeg', 0.1),
-                    webgl: this.getWebGLFingerprint()
-                };
-                
-                // Log individual factors for debugging
-                console.group('🔍 Fingerprint Analysis');
-                Object.keys(fingerprintData).forEach(key => {
-                    console.log(`${key}:`, fingerprintData[key]);
-                });
-                console.groupEnd();
-                
-                const fingerprint = Object.values(fingerprintData).join('|');
-                
-                // Better hash function
-                let hash = 0;
-                for (let i = 0; i < fingerprint.length; i++) {
-                    const char = fingerprint.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash; // Convert to 32-bit integer
-                }
-                
-                const deviceId = 'device_' + Math.abs(hash).toString(36);
-                console.log('🎯 Generated device ID:', deviceId);
-                return deviceId;
-            }
-
-            // Get WebGL fingerprint for additional uniqueness
-            getWebGLFingerprint() {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                    if (!gl) return 'no-webgl';
-                    
-                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                    const vendor = gl.getParameter(gl.VENDOR);
-                    const renderer = gl.getParameter(gl.RENDERER);
-                    
-                    return (debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : vendor) + '|' + 
-                           (debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : renderer);
-                } catch (e) {
-                    return 'webgl-error';
-                }
-            }
-
-            // Initialize tracking
             init() {
-                // Try to get existing device ID from localStorage first
-                const existingDevice = localStorage.getItem('cv_current_device_id');
-                if (existingDevice) {
-                    this.currentDeviceId = existingDevice;
-                    console.log('📱 Using existing device ID from localStorage:', this.currentDeviceId);
+                // Listen for updates (Realtime)
+                onValue(this.viewRef, (snapshot) => {
+                    const count = snapshot.val() || 0;
+                    this.animateCounter(count);
+                    console.log('🌐 Global visitor count updated:', count);
+                });
+
+                // Track visit logic
+                this.trackVisit();
+            }
+
+            async trackVisit() {
+                const STORAGE_KEY = 'cv_view_recorded';
+                // Only increment if they haven't visited in this session/browser
+                const hasVisited = localStorage.getItem(STORAGE_KEY);
+
+                if (!hasVisited) {
+                    // RUN TRANSACTION: This handles concurrent users safely
+                    await runTransaction(this.viewRef, (currentViews) => {
+                        return (currentViews || 0) + 1;
+                    });
+                    
+                    // Mark as visited so we don't spam refresh counts
+                    localStorage.setItem(STORAGE_KEY, 'true');
+                    console.log('🚀 New global view recorded!');
                 } else {
-                    // Generate new device ID
-                    this.currentDeviceId = this.generateDeviceFingerprint();
-                    // Store it in localStorage
-                    localStorage.setItem('cv_current_device_id', this.currentDeviceId);
-                    console.log('🆕 Generated new device ID:', this.currentDeviceId);
-                }
-                this.trackDevice();
-            }
-
-            // Track device visit
-            trackDevice() {
-                try {
-                    // Get existing devices data
-                    const devicesData = localStorage.getItem(this.devicesKey);
-                    let devices = devicesData ? JSON.parse(devicesData) : {};
-                    
-                    // Get current device data
-                    const currentDeviceData = localStorage.getItem(this.storageKey);
-                    let deviceInfo = currentDeviceData ? JSON.parse(currentDeviceData) : null;
-                    
-                    // Check if this is a new device
-                    const isNewDevice = !devices[this.currentDeviceId];
-                    
-                    if (isNewDevice) {
-                        // Add new device to registry
-                        devices[this.currentDeviceId] = {
-                            firstVisit: new Date().toISOString(),
-                            lastVisit: new Date().toISOString(),
-                            visitCount: 1,
-                            userAgent: navigator.userAgent,
-                            screen: `${screen.width}x${screen.height}`,
-                            language: navigator.language
-                        };
-                        
-                        console.log('🆕 New unique device detected:', this.currentDeviceId.substring(0, 12) + '...');
-                    } else {
-                        // Update existing device
-                        devices[this.currentDeviceId].lastVisit = new Date().toISOString();
-                        devices[this.currentDeviceId].visitCount++;
-                        console.log('🔄 Returning device detected:', this.currentDeviceId.substring(0, 12) + '...');
-                    }
-                    
-                    // Save devices registry
-                    localStorage.setItem(this.devicesKey, JSON.stringify(devices));
-                    
-                    // Save current device info
-                    deviceInfo = {
-                        deviceId: this.currentDeviceId,
-                        lastVisit: new Date().toISOString(),
-                        visitCount: devices[this.currentDeviceId].visitCount
-                    };
-                    localStorage.setItem(this.storageKey, JSON.stringify(deviceInfo));
-                    
-                    // Update counter with total unique devices
-                    const uniqueDeviceCount = Object.keys(devices).length;
-                    this.animateCounter(uniqueDeviceCount);
-                    
-                    console.log(` Device tracking: ${uniqueDeviceCount} unique devices | Current device visits: ${devices[this.currentDeviceId].visitCount}`);
-                    
-                    // No cleanup - keep all historical devices forever
-                    
-                } catch (error) {
-                    console.error('Error tracking device:', error);
-                    // Fallback: show at least 1
-                    this.animateCounter(1);
+                    console.log('👀 Returning visitor (global count not incremented)');
                 }
             }
 
-            
-            // Animate counter
             animateCounter(targetValue) {
                 const counterElement = document.getElementById('viewCount');
                 if (!counterElement) return;
                 
-                const startValue = parseInt(counterElement.textContent) || 0;
-                const duration = 1500;
+                const startValue = parseInt(counterElement.textContent.replace(/,/g, '')) || 0;
+                const duration = 2000; // 2 seconds
                 const startTime = performance.now();
                 
-                const animate = (currentTime) => {
+                // Easing function (ease-out cubic)
+                const easeOutCubic = (t) => {
+                    return 1 - Math.pow(1 - t, 3);
+                };
+                
+                const updateCounter = () => {
+                    const currentTime = performance.now();
                     const elapsed = currentTime - startTime;
                     const progress = Math.min(elapsed / duration, 1);
+                    const easedProgress = easeOutCubic(progress);
                     
-                    // Easing function for smooth animation
-                    const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-                    const currentValue = Math.floor(startValue + (targetValue - startValue) * easeOutQuart);
-                    
+                    const currentValue = Math.floor(startValue + (targetValue - startValue) * easedProgress);
                     counterElement.textContent = currentValue.toLocaleString();
                     
                     if (progress < 1) {
-                        requestAnimationFrame(animate);
+                        requestAnimationFrame(updateCounter);
                     }
                 };
                 
-                requestAnimationFrame(animate);
+                requestAnimationFrame(updateCounter);
             }
 
-            // Get device statistics
-            getStats() {
-                const devicesData = localStorage.getItem(this.devicesKey);
-                const devices = devicesData ? JSON.parse(devicesData) : {};
-                
-                return {
-                    totalDevices: Object.keys(devices).length,
-                    devices: devices,
-                    currentDeviceId: this.currentDeviceId
-                };
+            // Debug methods
+            getGlobalCount() {
+                onValue(this.viewRef, (snapshot) => {
+                    console.log('🌐 Current global visitor count:', snapshot.val() || 0);
+                });
+            }
+
+            forceIncrement() {
+                runTransaction(this.viewRef, (currentViews) => {
+                    return (currentViews || 0) + 1;
+                }).then(() => {
+                    console.log('🔄 Forced increment completed');
+                });
+            }
+
+            resetVisitFlag() {
+                localStorage.removeItem('cv_view_recorded');
+                console.log('🔄 Visit flag reset - next refresh will count as new visit');
             }
         }
 
-        // Initialize device tracker on page load
-        let deviceTracker;
+        // Start tracking when DOM is ready
         window.addEventListener('DOMContentLoaded', () => {
-            deviceTracker = new DeviceTracker();
-            
-            // Make it available globally for debugging
-            window.deviceTracker = deviceTracker;
+            const tracker = new FirebaseTracker();
             
             // Add debug commands
-            window.showDeviceStats = () => {
-                const stats = deviceTracker.getStats();
-                console.group('📊 Device Tracking Stats');
-                console.log('Total unique devices:', stats.totalDevices);
-                console.log('Current device ID:', stats.currentDeviceId);
-                console.log('All devices:', stats.devices);
-                console.groupEnd();
-            };
+            window.getGlobalCount = () => tracker.getGlobalCount();
+            window.forceIncrement = () => tracker.forceIncrement();
+            window.resetVisitFlag = () => tracker.resetVisitFlag();
             
-            window.clearDeviceData = () => {
-                localStorage.removeItem('cv_device_tracker');
-                localStorage.removeItem('cv_unique_devices');
-                console.log('⚠️ All historical device data cleared - use with caution!');
-            };
-            
-            console.log('🔧 Debug commands available:');
-            console.log('  showDeviceStats() - Show tracking statistics');
-            console.log('  showFingerprint() - Show current device fingerprint');
-            console.log('  clearDeviceData() - Clear all tracking data');
-            
-            window.showFingerprint = () => {
-                console.log('🔍 Current device fingerprint:', deviceTracker.currentDeviceId);
-                console.log('🔍 Raw fingerprint data:', deviceTracker.generateDeviceFingerprint());
-            };
-            
-            window.forceNewDevice = () => {
-                // Clear current device ID and regenerate
-                localStorage.removeItem('cv_current_device_id');
-                deviceTracker.currentDeviceId = deviceTracker.generateDeviceFingerprint();
-                localStorage.setItem('cv_current_device_id', deviceTracker.currentDeviceId);
-                console.log('🔄 Forced new device ID:', deviceTracker.currentDeviceId);
-                console.log('📊 Refresh page to see new device tracking');
-            };
+            console.log('🌐 Firebase Global Visitor Tracker initialized');
+            console.log('🔧 Debug commands:');
+            console.log('  getGlobalCount() - Show current global visitor count');
+            console.log('  forceIncrement() - Force increment global counter (testing)');
+            console.log('  resetVisitFlag() - Reset visit flag (testing)');
         });
     </script>
 
