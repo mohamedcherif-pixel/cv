@@ -413,19 +413,41 @@
                 ctx.font = '14px Arial';
                 ctx.fillText('Device fingerprint', 2, 2);
                 
-                const fingerprint = [
-                    navigator.userAgent,
-                    navigator.language,
-                    screen.width + 'x' + screen.height,
-                    screen.colorDepth,
-                    new Date().getTimezoneOffset(),
-                    canvas.toDataURL(),
-                    navigator.hardwareConcurrency || 'unknown',
-                    navigator.deviceMemory || 'unknown',
-                    navigator.platform
-                ].join('|');
+                // Enhanced fingerprinting with more unique factors
+                const fingerprintData = {
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    languages: navigator.languages ? navigator.languages.join(',') : 'unknown',
+                    screen: screen.width + 'x' + screen.height,
+                    colorDepth: screen.colorDepth,
+                    pixelDepth: screen.pixelDepth || screen.colorDepth,
+                    timezone: new Date().getTimezoneOffset(),
+                    canvas: canvas.toDataURL(),
+                    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+                    deviceMemory: navigator.deviceMemory || 'unknown',
+                    platform: navigator.platform,
+                    vendor: navigator.vendor || 'unknown',
+                    maxTouchPoints: navigator.maxTouchPoints || 0,
+                    isFirefox: typeof InstallTrigger !== 'undefined' ? 'firefox' : 'other',
+                    isChrome: typeof chrome !== 'undefined' ? 'chrome' : 'other',
+                    isSafari: typeof safari !== 'undefined' ? 'safari' : 'other',
+                    performance: performance.now(),
+                    randomSession: Math.random().toString(36).substr(2, 9),
+                    orientation: screen.orientation ? screen.orientation.type : 'unknown',
+                    canvasJPEG: canvas.toDataURL('image/jpeg', 0.1),
+                    webgl: this.getWebGLFingerprint()
+                };
                 
-                // Simple hash function
+                // Log individual factors for debugging
+                console.group('🔍 Fingerprint Analysis');
+                Object.keys(fingerprintData).forEach(key => {
+                    console.log(`${key}:`, fingerprintData[key]);
+                });
+                console.groupEnd();
+                
+                const fingerprint = Object.values(fingerprintData).join('|');
+                
+                // Better hash function
                 let hash = 0;
                 for (let i = 0; i < fingerprint.length; i++) {
                     const char = fingerprint.charCodeAt(i);
@@ -433,12 +455,43 @@
                     hash = hash & hash; // Convert to 32-bit integer
                 }
                 
-                return 'device_' + Math.abs(hash).toString(36);
+                const deviceId = 'device_' + Math.abs(hash).toString(36);
+                console.log('🎯 Generated device ID:', deviceId);
+                return deviceId;
+            }
+
+            // Get WebGL fingerprint for additional uniqueness
+            getWebGLFingerprint() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    if (!gl) return 'no-webgl';
+                    
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    const vendor = gl.getParameter(gl.VENDOR);
+                    const renderer = gl.getParameter(gl.RENDERER);
+                    
+                    return (debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : vendor) + '|' + 
+                           (debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : renderer);
+                } catch (e) {
+                    return 'webgl-error';
+                }
             }
 
             // Initialize tracking
             init() {
-                this.currentDeviceId = this.generateDeviceFingerprint();
+                // Try to get existing device ID from localStorage first
+                const existingDevice = localStorage.getItem('cv_current_device_id');
+                if (existingDevice) {
+                    this.currentDeviceId = existingDevice;
+                    console.log('📱 Using existing device ID from localStorage:', this.currentDeviceId);
+                } else {
+                    // Generate new device ID
+                    this.currentDeviceId = this.generateDeviceFingerprint();
+                    // Store it in localStorage
+                    localStorage.setItem('cv_current_device_id', this.currentDeviceId);
+                    console.log('🆕 Generated new device ID:', this.currentDeviceId);
+                }
                 this.trackDevice();
             }
 
@@ -568,7 +621,22 @@
             
             console.log('🔧 Debug commands available:');
             console.log('  showDeviceStats() - Show tracking statistics');
+            console.log('  showFingerprint() - Show current device fingerprint');
             console.log('  clearDeviceData() - Clear all tracking data');
+            
+            window.showFingerprint = () => {
+                console.log('🔍 Current device fingerprint:', deviceTracker.currentDeviceId);
+                console.log('🔍 Raw fingerprint data:', deviceTracker.generateDeviceFingerprint());
+            };
+            
+            window.forceNewDevice = () => {
+                // Clear current device ID and regenerate
+                localStorage.removeItem('cv_current_device_id');
+                deviceTracker.currentDeviceId = deviceTracker.generateDeviceFingerprint();
+                localStorage.setItem('cv_current_device_id', deviceTracker.currentDeviceId);
+                console.log('🔄 Forced new device ID:', deviceTracker.currentDeviceId);
+                console.log('📊 Refresh page to see new device tracking');
+            };
         });
     </script>
 
